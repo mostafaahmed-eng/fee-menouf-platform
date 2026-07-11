@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; color: #333; }
+    .header { background: #1a5276; color: white; padding: 25px; text-align: center; }
+    .header h1 { margin: 0; font-size: 24px; }
+    .content { padding: 30px; line-height: 1.8; }
+    .exam-details { background: #fef9e7; border: 2px solid #f39c12; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .exam-details .label { font-weight: bold; color: #555; }
+    .exam-details .value { font-size: 18px; margin-bottom: 10px; }
+    .footer { background: #f5f5f5; padding: 15px; text-align: center; font-size: 12px; color: #666; }
+    .btn { display: inline-block; padding: 10px 20px; background: #1a5276; color: white; text-decoration: none; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>FEE-MENOUF University</h1>
+    <p>Exam Schedule Notification</p>
+  </div>
+  <div class="content">
+    <p>Dear Student,</p>
+    <p>Your exam has been scheduled for the following course:</p>
+    <div class="exam-details">
+      <div class="value"><span class="label">Course:</span> {{courseName}}</div>
+      <div class="value"><span class="label">Date:</span> {{date}}</div>
+      <div class="value"><span class="label">Time:</span> {{time}}</div>
+    </div>
+    <p>Please ensure you arrive at least 15 minutes before the exam starts. Bring your student ID and necessary materials.</p>
+    <p style="text-align: center;"><a href="https://portal.fee-menouf.edu.eg/exams" class="btn">View Full Schedule</a></p>
+  </div>
+  <div class="footer">
+    <p>&copy; {{year}} Faculty of Engineering, Menoufia University. All rights reserved.</p>
+  </div>
+</body>
+</html>

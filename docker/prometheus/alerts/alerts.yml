@@ -1,0 +1,84 @@
+groups:
+  - name: fee-menouf-platform
+    interval: 30s
+    rules:
+      - alert: BackendDown
+        expr: up{job="backend"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend service is down"
+          description: "Backend has been unreachable for more than 30 seconds."
+
+      - alert: FrontendDown
+        expr: up{job="frontend"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Frontend service is down"
+          description: "Frontend has been unreachable for more than 30 seconds."
+
+      - alert: AiEngineDown
+        expr: up{job="ai-engine"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI Engine service is down"
+          description: "AI Engine has been unreachable for more than 30 seconds."
+
+      - alert: DatabaseDown
+        expr: up{job="postgres"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database service is down"
+          description: "PostgreSQL has been unreachable for more than 30 seconds."
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis service is down"
+          description: "Redis has been unreachable for more than 30 seconds."
+
+      - alert: HighApiLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job="backend"}[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API latency detected"
+          description: "P95 response time is above 2 seconds for 5 minutes."
+
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_total{job="backend", status=~"5.."}[5m])) / sum(rate(http_requests_total{job="backend"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is above 5% for 5 minutes."
+
+      - alert: DiskSpaceLow
+        expr: node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} < 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space"
+          description: "Less than 10% disk space available."
+
+      - alert: MemoryUsageHigh
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is above 90% for 5 minutes."

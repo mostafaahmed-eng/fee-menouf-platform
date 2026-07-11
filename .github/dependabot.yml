@@ -1,0 +1,120 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "03:00"
+      timezone: "Africa/Cairo"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "backend"
+    reviewers:
+      - "fee-menouf/backend-team"
+    assignees:
+      - "fee-menouf/devops"
+    commit-message:
+      prefix: "chore(backend)"
+      prefix-development: "chore(backend-dev)"
+      include: "scope"
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "04:00"
+      timezone: "Africa/Cairo"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "frontend"
+    reviewers:
+      - "fee-menouf/frontend-team"
+    assignees:
+      - "fee-menouf/devops"
+    commit-message:
+      prefix: "chore(frontend)"
+      prefix-development: "chore(frontend-dev)"
+      include: "scope"
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "pip"
+    directory: "/ai-engine"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "05:00"
+      timezone: "Africa/Cairo"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "ai-engine"
+    reviewers:
+      - "fee-menouf/ai-team"
+    assignees:
+      - "fee-menouf/devops"
+    commit-message:
+      prefix: "chore(ai-engine)"
+      include: "scope"
+
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "monthly"
+      time: "06:00"
+      timezone: "Africa/Cairo"
+    labels:
+      - "dependencies"
+      - "docker"
+    assignees:
+      - "fee-menouf/devops"
+
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    schedule:
+      interval: "monthly"
+      time: "06:00"
+      timezone: "Africa/Cairo"
+    labels:
+      - "dependencies"
+      - "docker"
+
+  - package-ecosystem: "docker"
+    directory: "/ai-engine"
+    schedule:
+      interval: "monthly"
+      time: "06:00"
+      timezone: "Africa/Cairo"
+    labels:
+      - "dependencies"
+      - "docker"
+
+  - package-ecosystem: "docker"
+    directory: "/docker/nginx"
+    schedule:
+      interval: "monthly"
+      time: "06:00"
+      timezone: "Africa/Cairo"
+    labels:
+      - "dependencies"
+      - "docker"
+
+  - package-ecosystem: "docker"
+    directory: "/docker/postgres"
+    schedule:
+      interval: "monthly"
+      time: "06:00"
+      timezone: "Africa/Cairo"
+    labels:
+      - "dependencies"
+      - "docker"

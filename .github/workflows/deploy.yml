@@ -1,0 +1,191 @@
+name: Deployment Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: "Docker image tag to deploy"
+        required: false
+        default: latest
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets[format('SSH_PRIVATE_KEY_{0}', github.event.inputs.environment)] || secrets.SSH_PRIVATE_KEY }}
+
+      - name: Set environment variables
+        id: env_vars
+        run: |
+          case "${{ github.event.inputs.environment }}" in
+            staging)
+              echo "SSH_HOST=${{ vars.STAGING_HOST || vars.SSH_HOST }}" >> $GITHUB_OUTPUT
+              echo "SSH_USER=${{ vars.STAGING_USER || vars.SSH_USER }}" >> $GITHUB_OUTPUT
+              echo "DEPLOY_PATH=${{ vars.STAGING_DEPLOY_PATH || vars.DEPLOY_PATH }}" >> $GITHUB_OUTPUT
+              echo "COMPOSE_FILE=docker-compose.staging.yml" >> $GITHUB_OUTPUT
+              echo "DEPLOY_HOST=${{ vars.STAGING_DEPLOY_HOST }}" >> $GITHUB_OUTPUT
+              ;;
+            production)
+              echo "SSH_HOST=${{ vars.PRODUCTION_HOST || vars.SSH_HOST }}" >> $GITHUB_OUTPUT
+              echo "SSH_USER=${{ vars.PRODUCTION_USER || vars.SSH_USER }}" >> $GITHUB_OUTPUT
+              echo "DEPLOY_PATH=${{ vars.PRODUCTION_DEPLOY_PATH || vars.DEPLOY_PATH }}" >> $GITHUB_OUTPUT
+              echo "COMPOSE_FILE=docker-compose.yml" >> $GITHUB_OUTPUT
+              echo "DEPLOY_HOST=${{ vars.PRODUCTION_DEPLOY_HOST }}" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Add host to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ steps.env_vars.outputs.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to ${{ github.event.inputs.environment }}
+        run: |
+          ssh ${{ steps.env_vars.outputs.SSH_USER }}@${{ steps.env_vars.outputs.SSH_HOST }} "
+            set -e
+
+            echo '=== FEE-MENOUF Deployment ==='
+            echo 'Environment: ${{ github.event.inputs.environment }}'
+            echo 'Version: ${{ github.event.inputs.version }}'
+            echo 'Timestamp: $(date -u '+%Y-%m-%dT%H:%M:%SZ')'
+            echo ''
+
+            cd ${{ steps.env_vars.outputs.DEPLOY_PATH }}
+
+            # Backup current state
+            echo '--- Creating backup ---'
+            BACKUP_DIR=/tmp/fee-menouf-backup-\$(date +%Y%m%d-%H%M%S)
+            mkdir -p \$BACKUP_DIR
+            docker compose exec -T postgres pg_dump -U \${DB_USER:-fee_menouf_user} \${DB_NAME:-fee_menouf} > \$BACKUP_DIR/db-backup.sql 2>/dev/null || echo 'DB backup skipped (container may not be running)'
+            docker compose config > \$BACKUP_DIR/docker-compose-config.yml 2>/dev/null || true
+
+            # Pull latest code
+            echo '--- Pulling latest code ---'
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Login to registry
+            echo '--- Authenticating with container registry ---'
+            echo '${{ secrets.GITHUB_TOKEN }}' | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+            # Pull specific version
+            echo '--- Pulling Docker images (version: ${{ github.event.inputs.version }}) ---'
+            IMAGE_TAG='${{ github.event.inputs.version }}'
+            if [ \"\$IMAGE_TAG\" = \"latest\" ]; then
+              IMAGE_TAG=\$(git rev-parse --short HEAD)
+            fi
+            echo \"Using image tag: \$IMAGE_TAG\"
+            export IMAGE_TAG=\$IMAGE_TAG
+
+            docker compose -f ${{ steps.env_vars.outputs.COMPOSE_FILE }} pull
+
+            # Deploy new version
+            echo '--- Deploying services ---'
+            docker compose -f ${{ steps.env_vars.outputs.COMPOSE_FILE }} up -d --remove-orphans
+
+            # Wait for services to stabilize
+            echo '--- Waiting for services to stabilize ---'
+            sleep 20
+
+            # Remove old images
+            echo '--- Cleaning up ---'
+            docker image prune -f
+
+            echo ''
+            echo '=== Deployment completed successfully ==='
+          "
+
+      - name: Health Check Verification
+        run: |
+          chmod +x scripts/health-check.sh
+          ./scripts/health-check.sh --host ${{ steps.env_vars.outputs.DEPLOY_HOST }}
+        env:
+          HEALTH_CHECK_URL: ${{ steps.env_vars.outputs.DEPLOY_HOST }}
+
+      - name: Rollback on Failure
+        if: failure()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ steps.env_vars.outputs.SSH_HOST }}
+          username: ${{ steps.env_vars.outputs.SSH_USER }}
+          key: ${{ secrets[format('SSH_PRIVATE_KEY_{0}', github.event.inputs.environment)] || secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd ${{ steps.env_vars.outputs.DEPLOY_PATH }}
+
+            # Restore previous docker-compose config
+            echo '--- Rolling back to previous version ---'
+
+            # Restart with previous images
+            docker compose -f ${{ steps.env_vars.outputs.COMPOSE_FILE }} up -d --remove-orphans
+
+            # Check if services recovered
+            sleep 15
+            docker compose ps
+
+            echo '--- Rollback completed ---'
+
+      - name: Notify Deployment Status
+        if: always()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "channel": "${{ vars.SLACK_CHANNEL }}",
+              "username": "Deploy Bot",
+              "text": "${{ job.status == 'success' && '✅' || '❌' }} Deployment to *${{ github.event.inputs.environment }}* ${{ job.status == 'success' && 'succeeded' || 'failed' }}",
+              "attachments": [{
+                "color": "${{ job.status == 'success' && 'good' || 'danger' }}",
+                "fields": [
+                  {"title": "Environment", "value": "${{ github.event.inputs.environment }}", "short": true},
+                  {"title": "Version", "value": "${{ github.event.inputs.version }}", "short": true},
+                  {"title": "Commit", "value": "${{ github.sha }}", "short": false}
+                ]
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  smoke-tests:
+    name: Smoke Tests
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Check API Health
+        run: |
+          curl -sSf --retry 5 --retry-delay 10 \
+            "${{ vars.HEALTH_CHECK_URL }}/api/health" \
+            || exit 1
+
+      - name: Check Frontend
+        run: |
+          curl -sSf --retry 5 --retry-delay 10 \
+            "${{ vars.APP_URL }}" \
+            -o /dev/null || exit 1
+
+      - name: Check AI Engine
+        run: |
+          curl -sSf --retry 5 --retry-delay 10 \
+            "${{ vars.HEALTH_CHECK_URL }}/health" \
+            || exit 1

@@ -1,0 +1,193 @@
+# =============================================================================
+# FEE-MENOUF Smart University Platform - .gitignore
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Node.js / JavaScript / TypeScript
+# ---------------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+yarn.lock
+package-lock.json
+.pnpm-debug.log*
+
+# Next.js
+.next/
+out/
+build/
+
+# NestJS
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+ai-engine/.env
+frontend/.env.local
+
+# Editor
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.sublime-project
+*.sublime-workspace
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+*.whl
+*.manifest
+*.spec
+
+# Python virtual environment
+.ai-engine/.venv/
+.ai-engine/venv/
+.venv/
+venv/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# pytest
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+*.cover
+coverage.xml
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ---------------------------------------------------------------------------
+# Docker
+# ---------------------------------------------------------------------------
+.docker/
+docker-compose.override.yml
+docker-compose.override.yaml
+
+# SSL certificates (do NOT commit)
+docker/nginx/ssl/*.pem
+docker/nginx/ssl/*.key
+docker/nginx/ssl/*.crt
+docker/nginx/ssl/*.csr
+
+# ---------------------------------------------------------------------------
+# Logs & Databases
+# ---------------------------------------------------------------------------
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
+# ---------------------------------------------------------------------------
+# MinIO / Uploads (local)
+# ---------------------------------------------------------------------------
+uploads/
+storage/
+minio-data/
+
+# ---------------------------------------------------------------------------
+# OS files
+# ---------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ---------------------------------------------------------------------------
+# System files
+# ---------------------------------------------------------------------------
+*.pid
+*.seed
+*.pid.lock
+*.tsbuildinfo
+.eslintcache
+
+# ---------------------------------------------------------------------------
+# Secrets & credentials
+# ---------------------------------------------------------------------------
+*.pem
+*.key
+*.cert
+credentials.json
+service-account.json
+*.cred
+secrets/
+
+# ---------------------------------------------------------------------------
+# Terraform
+# ---------------------------------------------------------------------------
+*.tfstate
+*.tfstate.*
+.terraform/
+crash.log
+
+# ---------------------------------------------------------------------------
+# AI / ML artifacts
+# ---------------------------------------------------------------------------
+.ai-engine/models/
+models/
+chroma_db/
+*.h5
+*.pt
+*.pth
+*.pkl
+*.joblib
+mlruns/
+lightning_logs/
+wandb/
+
+# ---------------------------------------------------------------------------
+# Testing
+# ---------------------------------------------------------------------------
+coverage/
+.nyc_output/
+junit.xml
+test-results/
+playwright-report/
+test-results/
+
+# ---------------------------------------------------------------------------
+# Misc
+# ---------------------------------------------------------------------------
+*.bak
+*.orig
+*.tmp
+.tmp/
+temp/
+tmp/

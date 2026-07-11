@@ -1,0 +1,87 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files:
+  - "alerts/*.yml"
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "backend"
+    metrics_path: "/api/metrics"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["backend:4000"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "fee-menouf-backend"
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: "(http_request_duration_seconds|http_requests_total|process_cpu_seconds_total|process_resident_memory_bytes|nodejs_heap_size_used_bytes|nodejs_heap_size_total_bytes|db_query_duration_seconds|redis_operation_duration_seconds)"
+        action: keep
+
+  - job_name: "frontend"
+    metrics_path: "/api/metrics"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["frontend:3000"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "fee-menouf-frontend"
+
+  - job_name: "ai-engine"
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["ai-engine:8000"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "fee-menouf-ai-engine"
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: "(python_info|process_cpu_seconds_total|process_resident_memory_bytes|http_request_duration_seconds|http_requests_total|ai_inference_duration_seconds|rag_retrieval_duration_seconds|embedding_duration_seconds|scheduler_execution_total)"
+        action: keep
+
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "fee-menouf-postgres"
+
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "fee-menouf-redis"
+
+  - job_name: "node"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "fee-menouf-host"
+
+  - job_name: "nginx"
+    static_configs:
+      - targets: ["nginx-exporter:9113"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "fee-menouf-nginx"

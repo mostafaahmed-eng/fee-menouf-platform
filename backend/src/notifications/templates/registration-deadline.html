@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; color: #333; }
+    .header { background: #2874a6; color: white; padding: 25px; text-align: center; }
+    .header h1 { margin: 0; font-size: 24px; }
+    .content { padding: 30px; line-height: 1.8; }
+    .deadline-box { background: #eaf2f8; border: 2px solid #2874a6; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center; }
+    .deadline-box .date { font-size: 28px; font-weight: bold; color: #2874a6; }
+    .footer { background: #f5f5f5; padding: 15px; text-align: center; font-size: 12px; color: #666; }
+    .btn { display: inline-block; padding: 10px 20px; background: #2874a6; color: white; text-decoration: none; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>FEE-MENOUF University</h1>
+    <p>Registration Deadline Reminder</p>
+  </div>
+  <div class="content">
+    <p>Dear Student,</p>
+    <p>This is a reminder that the course registration deadline is approaching.</p>
+    <div class="deadline-box">
+      <div>Registration Deadline:</div>
+      <div class="date">{{deadline}}</div>
+    </div>
+    <p>Please complete your course registration before the deadline. Late registration may not be accepted.</p>
+    <p style="text-align: center;"><a href="https://portal.fee-menouf.edu.eg/registration" class="btn">Register Now</a></p>
+    <p>Don't forget to consult your academic advisor before finalizing your course selection.</p>
+  </div>
+  <div class="footer">
+    <p>&copy; {{year}} Faculty of Engineering, Menoufia University. All rights reserved.</p>
+  </div>
+</body>
+</html>

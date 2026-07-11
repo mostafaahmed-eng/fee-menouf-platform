@@ -1,0 +1,339 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_TAG: ${{ github.sha }}
+  NODE_VERSION: "20"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        workspace: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: ${{ matrix.workspace }}/package-lock.json
+
+      - name: Install dependencies (${{ matrix.workspace }})
+        working-directory: ${{ matrix.workspace }}
+        run: npm ci
+
+      - name: ESLint (${{ matrix.workspace }})
+        working-directory: ${{ matrix.workspace }}
+        run: npm run lint
+
+      - name: Prettier Check (${{ matrix.workspace }})
+        working-directory: ${{ matrix.workspace }}
+        run: npx prettier --check "src/**/*.{ts,tsx}" --ignore-path ../.gitignore
+
+  ai-engine-lint:
+    name: AI Engine Lint (Python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+          cache-dependency-path: ai-engine/requirements.txt
+
+      - name: Install dependencies
+        working-directory: ai-engine
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 mypy
+          pip install -r requirements.txt
+
+      - name: Flake8
+        working-directory: ai-engine
+        run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: mypy
+        working-directory: ai-engine
+        run: mypy . --ignore-missing-imports || true
+
+  test:
+    name: Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: fee_menouf_test
+          POSTGRES_USER: fee_menouf_user
+          POSTGRES_PASSWORD: test_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Backend - Install & Test
+        working-directory: backend
+        run: |
+          npm ci
+          npm run test -- --ci --coverage --maxWorkers=2
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: fee_menouf_test
+          DB_USER: fee_menouf_user
+          DB_PASS: test_pass
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+
+      - name: Backend - Coverage Report
+        uses: davelosert/vitest-coverage-report-action@v2
+        if: github.event_name == 'pull_request'
+        with:
+          working-directory: backend
+          json-summary-path: coverage/coverage-summary.json
+
+      - name: Frontend - Build Check
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
+          NEXT_PUBLIC_WS_URL: ws://localhost:4000
+
+  security:
+    name: Security Scan
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript, python
+          queries: security-and-quality
+
+      - name: npm Audit (Backend)
+        working-directory: backend
+        run: npm audit --audit-level=high || true
+
+      - name: npm Audit (Frontend)
+        working-directory: frontend
+        run: npm audit --audit-level=high || true
+
+      - name: pip Audit (AI Engine)
+        working-directory: ai-engine
+        run: pip install pip-audit && pip-audit || true
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+      - name: Secret Scanning
+        uses: trufflesecurity/trufflehog@v3
+        with:
+          extra_args: --results=verified,unknown
+
+  build:
+    name: Build & Push Docker Images
+    needs: [test, security]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        service:
+          - name: backend
+            context: ./backend
+            dockerfile: ./backend/Dockerfile
+          - name: frontend
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile
+          - name: ai-engine
+            context: ./ai-engine
+            dockerfile: ./ai-engine/Dockerfile
+          - name: nginx
+            context: ./docker/nginx
+            dockerfile: ./docker/nginx/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.name }}
+          tags: |
+            type=sha,prefix=,suffix=,format=short
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to Production
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add host to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy via SSH
+        run: |
+          ssh ${{ vars.SSH_USER }}@${{ vars.SSH_HOST }} "
+            set -e
+            cd ${{ vars.DEPLOY_PATH }}
+
+            # Pull latest changes
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Login to container registry
+            echo '${{ secrets.GITHUB_TOKEN }}' | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+            # Pull latest images
+            docker compose pull
+
+            # Recreate services
+            docker compose up -d --remove-orphans
+
+            # Clean old images
+            docker image prune -f
+          "
+
+      - name: Health Check Verification
+        run: |
+          sleep 30
+          chmod +x scripts/health-check.sh
+          ./scripts/health-check.sh --host ${{ vars.DEPLOY_HOST }}
+        env:
+          HEALTH_CHECK_URL: ${{ vars.HEALTH_CHECK_URL }}
+
+      - name: Rollback on Failure
+        if: failure()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.SSH_HOST }}
+          username: ${{ vars.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ${{ vars.DEPLOY_PATH }}
+            docker compose up -d --remove-orphans
+
+      - name: Slack Notification (Success)
+        if: success()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "channel": "${{ vars.SLACK_CHANNEL }}",
+              "username": "CI/CD Bot",
+              "text": "✅ Deployment succeeded: ${{ github.repository }}@${{ github.sha }}",
+              "attachments": [{
+                "color": "good",
+                "fields": [
+                  {"title": "Environment", "value": "Production", "short": true},
+                  {"title": "Branch", "value": "main", "short": true},
+                  {"title": "Commit", "value": "${{ github.sha }}", "short": false}
+                ]
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Slack Notification (Failure)
+        if: failure()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "channel": "${{ vars.SLACK_CHANNEL }}",
+              "username": "CI/CD Bot",
+              "text": "❌ Deployment FAILED: ${{ github.repository }}@${{ github.sha }}",
+              "attachments": [{
+                "color": "danger",
+                "fields": [
+                  {"title": "Environment", "value": "Production", "short": true},
+                  {"title": "Branch", "value": "main", "short": true},
+                  {"title": "Commit", "value": "${{ github.sha }}", "short": false}
+                ]
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
