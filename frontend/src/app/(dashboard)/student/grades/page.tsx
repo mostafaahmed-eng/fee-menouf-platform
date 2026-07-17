@@ -143,7 +143,7 @@ export default function GradesPage() {
               <div>
                 <p className="text-sm text-muted-foreground">GPA الفصل</p>
                 <p className="text-2xl font-bold text-primary">
-                  {semesterGpa.toFixed(2)}
+                  {Number(semesterGpa ?? 0).toFixed(2)}
                 </p>
               </div>
               <TrendingUp className="h-8 w-8 text-primary/40" />
@@ -156,7 +156,7 @@ export default function GradesPage() {
               <div>
                 <p className="text-sm text-muted-foreground">CGPA</p>
                 <p className="text-2xl font-bold text-blue-500">
-                  {latestRecord?.cgpa?.toFixed(2) ?? '---'}
+                  {Number(latestRecord?.cgpa ?? 0).toFixed(2) ?? '---'}
                 </p>
               </div>
               <GraduationCap className="h-8 w-8 text-blue-500/40" />

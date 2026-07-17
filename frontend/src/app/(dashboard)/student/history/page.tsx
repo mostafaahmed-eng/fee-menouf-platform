@@ -64,7 +64,7 @@ export default function AcademicHistoryPage() {
         <Card>
           <CardContent className="pt-6 text-center">
             <GraduationCap className="h-5 w-5 mx-auto mb-2 text-primary" />
-            <p className="text-2xl font-bold">{history?.cgpa?.toFixed(2) || '—'}</p>
+            <p className="text-2xl font-bold">{Number(history?.cgpa ?? 0).toFixed(2) || '—'}</p>
             <p className="text-xs text-muted-foreground">المعدل التراكمي</p>
           </CardContent>
         </Card>
@@ -112,7 +112,7 @@ export default function AcademicHistoryPage() {
                     الفصل {sem.semester} - {sem.academicYear}
                   </CardTitle>
                   <CardDescription>
-                    المعدل: {sem.gpa?.toFixed(2) ?? '0.00'} | إجمالي الوحدات: {sem.totalCredits}
+                    المعدل: {Number(sem.gpa ?? 0).toFixed(2) ?? '0.00'} | إجمالي الوحدات: {sem.totalCredits}
                   </CardDescription>
                 </div>
                 <Badge variant={(sem.gpa ?? 0) >= 2 ? 'success' : 'warning'}>

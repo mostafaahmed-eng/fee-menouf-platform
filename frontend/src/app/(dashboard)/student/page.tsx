@@ -37,26 +37,27 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-function AnimatedCounter({ value, suffix = '' }: { value: number; suffix?: string }) {
+function AnimatedCounter({ value, suffix = '' }: { value: number | string | null | undefined; suffix?: string }) {
+  const numericValue = Number(value) || 0;
   const [display, setDisplay] = useState(0);
   useEffect(() => {
     let start = 0;
     const duration = 1000;
-    const step = Math.max(1, Math.floor(value / 60));
+    const step = Math.max(1, Math.floor(numericValue / 60));
     const timer = setInterval(() => {
       start += step;
-      if (start >= value) {
-        setDisplay(value);
+      if (start >= numericValue) {
+        setDisplay(numericValue);
         clearInterval(timer);
       } else {
         setDisplay(start);
       }
     }, duration / 60);
     return () => clearInterval(timer);
-  }, [value]);
+  }, [numericValue]);
   return (
     <span>
-      {display.toFixed(2)}
+      {Number(display).toFixed(2)}
       {suffix}
     </span>
   );

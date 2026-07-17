@@ -87,7 +87,7 @@ export default function Transcript({
               </div>
               <div>
                 <p className="text-muted-foreground">CGPA</p>
-                <p className="font-medium text-lg text-primary">{cgpa?.toFixed(2) || '---'}</p>
+                <p className="font-medium text-lg text-primary">{Number(cgpa ?? 0).toFixed(2) || '---'}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">إجمالي الساعات</p>
@@ -101,7 +101,7 @@ export default function Transcript({
               {Object.entries(groupedBySemester).map(([semester, semGrades]) => {
                 const semGpa =
                   semGrades.length > 0
-                    ? (
+                    ? Number(
                         semGrades.reduce((sum, g) => sum + g.gpaPoints * g.credits, 0) /
                         semGrades.reduce((sum, g) => sum + g.credits, 0)
                       ).toFixed(2)

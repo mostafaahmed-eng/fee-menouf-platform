@@ -24,6 +24,12 @@ const publicRoutes = [
   '/api',
 ]
 
+// Shared routes accessible to all authenticated roles
+const sharedRoutes = [
+  '/ai-assistant',
+  '/settings',
+]
+
 function getTokenFromRequest(request: NextRequest): string | null {
   const authCookie = request.cookies.get('auth-token')
   if (authCookie?.value) return authCookie.value
@@ -78,6 +84,11 @@ export function middleware(request: NextRequest) {
     const res = NextResponse.redirect(loginUrl)
     res.cookies.delete('auth-token')
     return res
+  }
+
+  // Allow shared routes accessible to all authenticated roles
+  if (sharedRoutes.some(route => pathname.startsWith(route))) {
+    return NextResponse.next()
   }
 
   // Check role-based access

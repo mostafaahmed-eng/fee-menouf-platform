@@ -7,6 +7,7 @@ from datetime import datetime
 from app.config import settings
 from app.chat.prompts import SYSTEM_PROMPT_EN, SYSTEM_PROMPT_AR
 from app.chat.context_builder import context_builder
+from app.chat.rule_based import rule_based_ai
 from app.utils.text_processor import detect_language, count_tokens
 from app.utils.rate_limiter import get_rate_limiter
 
@@ -237,19 +238,38 @@ class ChatEngine:
         return suggestions[:count]
 
     def _generate_fallback(self, query: str, context_data: dict, language: str) -> str:
-        logger.warning(f"AI service unavailable for query: {query[:80]}. Returning service unavailable message.")
+        rule_response = rule_based_ai.respond(query, language)
+        if rule_response:
+            logger.info(f"Rule-based response for query: {query[:50]}")
+            return rule_response
+
+        logger.warning(f"No rule-based match for query: {query[:80]}. Returning default message.")
 
         if language == "ar":
             return (
-                "عذراً، خدمة الذكاء الاصطناعي غير متاحة حالياً. "
-                "يرجى المحاولة مرة أخرى لاحقاً. "
-                "للاستفسارات العاجلة، يرجى التواصل مع مكتب شؤون الطلاب بالكلية."
+                "عذراً، لا أستطيع الإجابة على هذا السؤال حالياً. "
+                "يمكنني مساعدتك في:\n"
+                "• سياسة الحضور والغياب\n"
+                "• كيفية حساب المعدل التراكمي\n"
+                "• التسجيل في المقررات\n"
+                "• متطلبات التخرج\n"
+                "• معلومات التواصل\n"
+                "• نظام الامتحانات\n"
+                "• المرشد الأكاديمي\n\n"
+                "يرجى إعادة صياغة سؤالك أو اختيار أحد المواضيع أعلاه."
             )
         else:
             return (
-                "Sorry, the AI service is currently unavailable. "
-                "Please try again later. "
-                "For urgent inquiries, please contact the faculty's student affairs office."
+                "Sorry, I cannot answer this question right now. "
+                "I can help you with:\n"
+                "• Attendance and absence policy\n"
+                "• How to calculate GPA/CGPA\n"
+                "• Course registration\n"
+                "• Graduation requirements\n"
+                "• Contact information\n"
+                "• Exam regulations\n"
+                "• Academic advisor\n\n"
+                "Please rephrase your question or choose one of the topics above."
             )
 
 

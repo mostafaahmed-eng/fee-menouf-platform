@@ -19,10 +19,11 @@ const nextConfig: NextConfig = {
     deviceSizes: [640, 768, 1024, 1280, 1536],
   },
   async rewrites() {
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8888/api/v1").replace(/\/api\/v1\/?$/, "");
     return [
       {
-        source: "/api/:path*",
-        destination: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8888/api/v1"}/:path*`,
+        source: "/api/v1/:path*",
+        destination: `${apiBase}/api/v1/:path*`,
       },
     ];
   },

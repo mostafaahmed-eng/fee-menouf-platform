@@ -105,13 +105,28 @@ export default function AiAssistantPage() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let accumulated = '';
+        let buffer = '';
         let streamMessageId = (Date.now() + 1).toString();
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          accumulated += chunk;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith('data: ')) continue;
+            const jsonStr = trimmed.slice(6);
+            try {
+              const parsed = JSON.parse(jsonStr);
+              if (parsed.content) {
+                accumulated += parsed.content;
+              }
+            } catch {}
+          }
 
           setMessages((prev) => {
             const exists = prev.find((m) => m.id === streamMessageId);

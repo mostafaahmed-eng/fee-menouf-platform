@@ -46,7 +46,7 @@ export default function SemesterCard({ semester, index }: SemesterCardProps) {
             <div className="flex items-center gap-3">
               <div className="text-left">
                 <Badge variant="secondary" className="text-xs">
-                  GPA: {semester.gpa?.toFixed(2) ?? '0.00'}
+                  GPA: {Number(semester.gpa ?? 0).toFixed(2) ?? '0.00'}
                 </Badge>
               </div>
               {expanded ? (

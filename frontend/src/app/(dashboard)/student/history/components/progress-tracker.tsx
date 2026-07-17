@@ -102,7 +102,7 @@ export default function ProgressTracker({
               <GraduationCap className="h-5 w-5 text-primary" />
               <span className="text-sm">
                 المعدل التراكمي:{' '}
-                <span className="font-bold text-lg">{cgpa.toFixed(2)}</span>
+                <span className="font-bold text-lg">{Number(cgpa ?? 0).toFixed(2)}</span>
               </span>
             </div>
           )}
