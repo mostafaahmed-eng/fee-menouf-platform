@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { AiConversation, ConversationRole, ConversationLanguage } from '../database/entities/ai-conversation.entity';
-import { User } from '../database/entities/user.entity';
 
 @Injectable()
 export class AiService {
@@ -46,7 +45,7 @@ export class AiService {
 
   async getConversationHistory(userId: string, sessionId: string): Promise<AiConversation[]> {
     return this.conversationRepository.find({
-      where: { user: { id: userId } as User, sessionId },
+      where: { user: { id: userId }, sessionId },
       order: { timestamp: 'ASC' },
     });
   }
@@ -66,11 +65,11 @@ export class AiService {
   }
 
   async deleteSession(userId: string, sessionId: string): Promise<void> {
-    await this.conversationRepository.delete({ user: { id: userId } as User, sessionId });
+    await this.conversationRepository.delete({ user: { id: userId }, sessionId });
   }
 
   async clearAllConversations(userId: string): Promise<number> {
-    const result = await this.conversationRepository.delete({ user: { id: userId } as User });
+    const result = await this.conversationRepository.delete({ user: { id: userId } });
     return result.affected || 0;
   }
 

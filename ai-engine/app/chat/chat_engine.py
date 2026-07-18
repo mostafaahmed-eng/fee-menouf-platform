@@ -62,8 +62,8 @@ class ChatEngine:
     def _get_openai_client(self):
         if self._openai_client is None and settings.OPENAI_API_KEY:
             try:
-                from openai import OpenAI
-                self._openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
+                from openai import AsyncOpenAI
+                self._openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
             except Exception as e:
                 logger.error(f"Failed to create OpenAI client: {e}")
         return self._openai_client
@@ -121,7 +121,7 @@ class ChatEngine:
 
         if client:
             try:
-                response = client.chat.completions.create(
+                response = await client.chat.completions.create(
                     model=settings.MODEL_NAME,
                     messages=messages,
                     max_tokens=settings.MAX_TOKENS,
@@ -191,7 +191,7 @@ class ChatEngine:
 
         if client:
             try:
-                stream = client.chat.completions.create(
+                stream = await client.chat.completions.create(
                     model=settings.MODEL_NAME,
                     messages=messages,
                     max_tokens=settings.MAX_TOKENS,
@@ -200,7 +200,7 @@ class ChatEngine:
                 )
 
                 full_answer = ""
-                for chunk in stream:
+                async for chunk in stream:
                     delta = chunk.choices[0].delta.content or ""
                     if delta:
                         full_answer += delta

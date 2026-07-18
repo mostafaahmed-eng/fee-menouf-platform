@@ -1,4 +1,5 @@
 import logging
+import uuid
 from typing import Optional
 from pydantic import BaseModel
 
@@ -32,7 +33,8 @@ class SuggestRequest(BaseModel):
 @router.post("")
 async def send_message(request: ChatRequest, req: Request):
     client_host = req.client.host if req.client else "unknown"
-    rate_key = f"chat:{client_host}:{request.session_id}"
+    session_id = request.session_id if request.session_id != "default" else f"anon-{client_host}-{uuid.uuid4().hex[:12]}"
+    rate_key = f"chat:{client_host}:{session_id}"
 
     limiter = get_rate_limiter()
     if not limiter.check(rate_key):
@@ -41,7 +43,7 @@ async def send_message(request: ChatRequest, req: Request):
     try:
         result = await chat_engine.send_message(
             query=request.message,
-            session_id=request.session_id,
+            session_id=session_id,
             student_data=request.student_data,
             system_prompt_override=request.system_prompt,
         )
@@ -54,7 +56,8 @@ async def send_message(request: ChatRequest, req: Request):
 @router.post("/stream")
 async def stream_chat(request: ChatRequest, req: Request):
     client_host = req.client.host if req.client else "unknown"
-    rate_key = f"chat:stream:{client_host}:{request.session_id}"
+    session_id = request.session_id if request.session_id != "default" else f"anon-{client_host}-{uuid.uuid4().hex[:12]}"
+    rate_key = f"chat:stream:{client_host}:{session_id}"
 
     limiter = get_rate_limiter()
     if not limiter.check(rate_key):
@@ -63,7 +66,7 @@ async def stream_chat(request: ChatRequest, req: Request):
     async def event_generator():
         async for event in chat_engine.send_message_stream(
             query=request.message,
-            session_id=request.session_id,
+            session_id=session_id,
             student_data=request.student_data,
         ):
             yield event

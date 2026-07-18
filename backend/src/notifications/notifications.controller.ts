@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Param, Delete, Query, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
-import { SendNotificationDto } from './dto/notification.dto';
+import { SendNotificationDto, NotificationFilterDto } from './dto/notification.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../database/entities/user.entity';
@@ -25,8 +25,8 @@ export class NotificationsController {
 
   @Get()
   @ApiOperation({ summary: 'Get my notifications' })
-  findAll(@CurrentUser() user: User, @Query() query: any) {
-    return this.notificationsService.findAllForUser(user.id, query);
+  findAll(@CurrentUser() user: User, @Query() query: NotificationFilterDto) {
+    return this.notificationsService.findAllForUser(user.id, query as any);
   }
 
   @Get('unread-count')
@@ -37,8 +37,8 @@ export class NotificationsController {
 
   @Post(':id/read')
   @ApiOperation({ summary: 'Mark notification as read' })
-  markAsRead(@Param('id', ParseUUIDPipe) id: string) {
-    return this.notificationsService.markAsRead(id);
+  markAsRead(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
+    return this.notificationsService.markAsRead(id, user);
   }
 
   @Post('mark-all-read')
@@ -49,8 +49,8 @@ export class NotificationsController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a notification' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.notificationsService.remove(id);
+  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
+    return this.notificationsService.remove(id, user);
   }
 
   @Delete()

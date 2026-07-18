@@ -16,8 +16,11 @@ def setup_logging() -> None:
 
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
-    root_logger.handlers.clear()
-    root_logger.addHandler(handler)
+    if not root_logger.handlers:
+        root_logger.addHandler(handler)
+    else:
+        root_logger.handlers.clear()
+        root_logger.addHandler(handler)
 
     logging.getLogger("uvicorn").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)

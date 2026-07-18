@@ -204,7 +204,7 @@ export class CoursesService {
       fs.writeFileSync(path.join(uploadDir, uniqueName), file.buffer);
       url = `/uploads/${uniqueName}`;
     }
-    const doctor = await this.materialRepo.manager.findOne('Doctor' as any, { where: { userId } }) as any;
+    const doctor = await this.materialRepo.manager.findOne(Doctor, { where: { userId } });
     const payload: any = { ...dto, courseId, uploadedById: doctor?.id || null, url };
     if (payload.url === undefined) payload.url = '';
     const material = this.materialRepo.create(payload);

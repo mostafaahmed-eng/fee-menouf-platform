@@ -18,7 +18,7 @@ logger = logging.getLogger("ai_engine")
 async def lifespan(app: FastAPI):
     setup_logging()
     logger.info("AI Engine starting up...")
-    logger.info(f"Primary: {settings.PRIMARY_MODEL}, Fallback: {settings.FALLBACK_MODEL}, Embedding: {settings.EMBEDDING_MODEL}")
+    logger.info(f"Model: {settings.MODEL_NAME}, Fallback: {settings.FALLBACK_MODEL}, Embedding: {settings.EMBEDDING_MODEL}")
     ingest_result = rag_engine.ingest_knowledge_directory("data/knowledge")
     logger.info(f"Knowledge base: {ingest_result['ingested']} files ingested")
     yield
@@ -46,13 +46,6 @@ app.add_middleware(
 @app.middleware("http")
 async def request_logging_middleware(request: Request, call_next):
     start_time = time.time()
-    body = None
-    if request.method in ("POST", "PUT", "PATCH"):
-        try:
-            body = await request.json()
-        except Exception:
-            body = None
-
     response = await call_next(request)
 
     process_time = (time.time() - start_time) * 1000

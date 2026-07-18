@@ -99,7 +99,7 @@ class RiskPredictorModel:
 
             scores[i] = min(score, 1.0)
 
-        return scores.reshape(-1, 1)
+        return scores
 
     def _features_to_array(self, features: dict) -> np.ndarray:
         return np.array([

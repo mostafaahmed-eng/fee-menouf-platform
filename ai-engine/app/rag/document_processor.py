@@ -50,7 +50,6 @@ class DocumentProcessor:
         return path.read_text(encoding="utf-8")
 
     def load_html(self, file_path: str) -> str:
-        from markdown import markdown
         text = Path(file_path).read_text(encoding="utf-8")
         cleaned = re.sub(r"<[^>]+>", " ", text)
         return cleaned

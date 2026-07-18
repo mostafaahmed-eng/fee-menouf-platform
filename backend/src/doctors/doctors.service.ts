@@ -59,7 +59,13 @@ export class DoctorsService {
 
   async update(id: string, dto: UpdateDoctorDto): Promise<Doctor> {
     const doctor = await this.findOne(id);
-    Object.assign(doctor, dto);
+    if (dto.employeeId !== undefined) doctor.employeeId = dto.employeeId;
+    if (dto.title !== undefined) doctor.title = dto.title;
+    if (dto.userId !== undefined) doctor.userId = dto.userId;
+    if (dto.departmentId !== undefined) doctor.departmentId = dto.departmentId;
+    if (dto.specialization !== undefined) doctor.specialization = dto.specialization;
+    if (dto.officeLocation !== undefined) doctor.officeLocation = dto.officeLocation;
+    if (dto.officeHours !== undefined) doctor.officeHours = dto.officeHours;
     return this.doctorRepo.save(doctor);
   }
 

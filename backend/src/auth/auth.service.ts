@@ -6,8 +6,11 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import * as bcrypt from 'bcrypt';
-import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
+import { createHash } from 'crypto';
+import { v4 as uuidv4 } from 'uuid';
 import { User, UserRole } from '../database/entities/user.entity';
 import { Student, StudentStatus } from '../database/entities/student.entity';
 import { Doctor } from '../database/entities/doctor.entity';
@@ -19,7 +22,6 @@ import { sanitizeUser } from '../common/utils/sanitize-user.util';
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private readonly loginAttempts: Map<string, { count: number; lastAttempt: Date }> = new Map();
 
   constructor(
     @InjectRepository(User)
@@ -34,7 +36,12 @@ export class AuthService {
     private advisorRepository: Repository<Advisor>,
     private jwtService: JwtService,
     private configService: ConfigService,
+    @InjectQueue('auth-rate-limit') private rateLimitQueue: Queue,
   ) {}
+
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
 
   async register(dto: RegisterDto) {
     const SELF_REGISTRATION_ROLES = [UserRole.STUDENT];
@@ -50,6 +57,10 @@ export class AuthService {
     const salt = await bcrypt.genSalt(this.configService.get<number>('app.bcryptSaltRounds') || 12);
     const hashedPassword = await bcrypt.hash(dto.password, salt);
 
+    const verificationToken = uuidv4();
+    const verificationTokenHash = this.hashToken(verificationToken);
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
     const user = this.userRepository.create({
       email: dto.email,
       password: hashedPassword,
@@ -59,14 +70,25 @@ export class AuthService {
       phone: dto.phone || undefined,
       isActive: true,
       isVerified: false,
+      emailVerificationToken: verificationTokenHash,
+      emailVerificationExpires: verificationExpires,
     });
     const savedUser = await this.userRepository.save(user) as User;
 
     if (dto.role === UserRole.STUDENT) {
-      const studentCount = await this.studentRepository.count();
+      const maxResult = await this.studentRepository
+        .createQueryBuilder('student')
+        .select('MAX(student.student_id)', 'maxId')
+        .where('student.student_id LIKE :prefix', { prefix: `${new Date().getFullYear()}%` })
+        .getRawOne();
+      let nextNum = 1;
+      if (maxResult?.maxId) {
+        const lastNum = parseInt(maxResult.maxId.slice(-4), 10);
+        if (!isNaN(lastNum)) nextNum = lastNum + 1;
+      }
       const student = this.studentRepository.create({
         userId: savedUser.id,
-        studentId: `${new Date().getFullYear()}${String(studentCount + 1).padStart(4, '0')}`,
+        studentId: `${new Date().getFullYear()}${String(nextNum).padStart(4, '0')}`,
         departmentId: dto.departmentId || undefined,
         level: 1,
         nationalId: '',
@@ -78,26 +100,50 @@ export class AuthService {
       });
       await this.studentRepository.save(student);
     } else if (dto.role === UserRole.DOCTOR) {
-      const doctorCount = await this.doctorRepository.count();
+      const maxResult = await this.doctorRepository
+        .createQueryBuilder('doctor')
+        .select("MAX(CAST(SUBSTRING(doctor.employee_id FROM 4) AS INTEGER))", 'maxNum')
+        .where('doctor.employee_id LIKE :prefix', { prefix: 'DOC%' })
+        .getRawOne();
+      let nextNum = 1;
+      if (maxResult?.maxNum) {
+        nextNum = parseInt(maxResult.maxNum, 10) + 1;
+      }
       const doctor = this.doctorRepository.create({
         userId: savedUser.id,
-        employeeId: `DOC${String(doctorCount + 1).padStart(4, '0')}`,
+        employeeId: `DOC${String(nextNum).padStart(4, '0')}`,
         departmentId: dto.departmentId || undefined,
       });
       await this.doctorRepository.save(doctor);
     } else if (dto.role === UserRole.TA) {
-      const taCount = await this.taRepository.count();
+      const maxResult = await this.taRepository
+        .createQueryBuilder('ta')
+        .select("MAX(CAST(SUBSTRING(ta.employee_id FROM 3) AS INTEGER))", 'maxNum')
+        .where('ta.employee_id LIKE :prefix', { prefix: 'TA%' })
+        .getRawOne();
+      let nextNum = 1;
+      if (maxResult?.maxNum) {
+        nextNum = parseInt(maxResult.maxNum, 10) + 1;
+      }
       const ta = this.taRepository.create({
         userId: savedUser.id,
-        employeeId: `TA${String(taCount + 1).padStart(4, '0')}`,
+        employeeId: `TA${String(nextNum).padStart(4, '0')}`,
         departmentId: dto.departmentId || undefined,
       });
       await this.taRepository.save(ta);
     } else if (dto.role === UserRole.ADVISOR) {
-      const advisorCount = await this.advisorRepository.count();
+      const maxResult = await this.advisorRepository
+        .createQueryBuilder('advisor')
+        .select("MAX(CAST(SUBSTRING(advisor.employee_id FROM 4) AS INTEGER))", 'maxNum')
+        .where('advisor.employee_id LIKE :prefix', { prefix: 'ADV%' })
+        .getRawOne();
+      let nextNum = 1;
+      if (maxResult?.maxNum) {
+        nextNum = parseInt(maxResult.maxNum, 10) + 1;
+      }
       const advisor = this.advisorRepository.create({
         userId: savedUser.id,
-        employeeId: `ADV${String(advisorCount + 1).padStart(4, '0')}`,
+        employeeId: `ADV${String(nextNum).padStart(4, '0')}`,
         departmentId: dto.departmentId || undefined,
       });
       await this.advisorRepository.save(advisor);
@@ -108,7 +154,7 @@ export class AuthService {
   }
 
   async login(email: string, password: string, ip?: string) {
-    this.checkLoginRateLimit(email, ip);
+    await this.checkLoginRateLimit(email, ip);
 
     const user = await this.userRepository.findOne({ where: { email } });
     if (!user) {
@@ -121,11 +167,11 @@ export class AuthService {
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      this.recordFailedAttempt(email);
+      await this.recordFailedAttempt(email);
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    this.loginAttempts.delete(email);
+    await this.clearLoginAttempts(email);
     await this.userRepository.update(user.id, { lastLogin: new Date() });
 
     const tokens = await this.generateTokens(user);
@@ -198,7 +244,10 @@ export class AuthService {
       return { message: 'If the email exists, a password reset link has been sent' };
     }
     const resetToken = uuidv4();
-    user.refreshToken = resetToken;
+    const resetTokenHash = this.hashToken(resetToken);
+    const expires = new Date(Date.now() + 60 * 60 * 1000);
+    user.passwordResetToken = resetTokenHash;
+    user.passwordResetExpires = expires;
     await this.userRepository.save(user);
     this.logger.log(`Password reset requested for ${email}`);
     return { message: 'If the email exists, a password reset link has been sent' };
@@ -208,13 +257,17 @@ export class AuthService {
     if (!token) {
       throw new BadRequestException('Invalid reset token');
     }
-    const user = await this.userRepository.findOne({ where: { refreshToken: token } });
-    if (!user) {
+    const tokenHash = this.hashToken(token);
+    const user = await this.userRepository.findOne({
+      where: { passwordResetToken: tokenHash },
+    });
+    if (!user || !user.passwordResetExpires || user.passwordResetExpires < new Date()) {
       throw new BadRequestException('Invalid or expired reset token');
     }
     const salt = await bcrypt.genSalt(this.configService.get<number>('app.bcryptSaltRounds') || 12);
     user.password = await bcrypt.hash(newPassword, salt);
-    user.refreshToken = null as unknown as string;
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
     await this.userRepository.save(user);
     this.logger.log(`Password reset completed for user: ${user.email}`);
     return { message: 'Password reset successfully' };
@@ -224,14 +277,16 @@ export class AuthService {
     if (!token) {
       throw new BadRequestException('Invalid verification token');
     }
-    if (!uuidValidate(token)) {
-      throw new BadRequestException('Invalid verification token format');
-    }
-    const user = await this.userRepository.findOne({ where: { id: token } });
-    if (!user) {
+    const tokenHash = this.hashToken(token);
+    const user = await this.userRepository.findOne({
+      where: { emailVerificationToken: tokenHash },
+    });
+    if (!user || !user.emailVerificationExpires || user.emailVerificationExpires < new Date()) {
       throw new BadRequestException('Invalid or expired verification token');
     }
     user.isVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
     await this.userRepository.save(user);
     this.logger.log(`Email verified for user: ${user.email}`);
     return { message: 'Email verified successfully' };
@@ -270,35 +325,38 @@ export class AuthService {
     return sanitizeUser(user);
   }
 
-  private checkLoginRateLimit(email: string, ip?: string) {
-    const key = email || ip || 'unknown';
-    const attempts = this.loginAttempts.get(key);
-    if (attempts) {
-      const windowMs = this.configService.get<number>('app.loginRateLimitWindow') || 900000;
+  private async checkLoginRateLimit(email: string, ip?: string) {
+    const key = `login:${email || ip || 'unknown'}`;
+    const client = this.rateLimitQueue.client;
+    const count = await client.get(key);
+    if (count) {
       const maxAttempts = this.configService.get<number>('app.loginRateLimitMax') || 5;
-      const elapsed = Date.now() - attempts.lastAttempt.getTime();
-      if (elapsed < windowMs && attempts.count >= maxAttempts) {
-        this.logger.warn(`Account lockout triggered for ${key} (${attempts.count} attempts)`);
+      if (parseInt(count, 10) >= maxAttempts) {
+        const ttl = await client.pttl(key);
+        this.logger.warn(`Account lockout triggered for ${key} (${count} attempts)`);
         throw new UnauthorizedException(
-          `Too many login attempts. Please try again after ${Math.ceil((windowMs - elapsed) / 1000)} seconds`,
+          `Too many login attempts. Please try again after ${Math.ceil(ttl / 1000)} seconds`,
         );
       }
-      if (elapsed >= windowMs) {
-        this.loginAttempts.delete(key);
-      }
     }
   }
 
-  private recordFailedAttempt(email: string) {
-    const key = email;
-    const current = this.loginAttempts.get(key) || { count: 0, lastAttempt: new Date() };
-    current.count += 1;
-    current.lastAttempt = new Date();
-    this.loginAttempts.set(key, current);
-    if (current.count >= 5) {
-      this.logger.warn(`Account lockout threshold reached for ${key}: ${current.count} failed attempts`);
+  private async recordFailedAttempt(email: string) {
+    const key = `login:${email}`;
+    const client = this.rateLimitQueue.client;
+    const count = await client.incr(key);
+    if (count === 1) {
+      const windowMs = this.configService.get<number>('app.loginRateLimitWindow') || 900000;
+      await client.pexpire(key, windowMs);
     }
+    if (count >= 5) {
+      this.logger.warn(`Account lockout threshold reached for ${email}: ${count} failed attempts`);
+    }
+  }
+
+  private async clearLoginAttempts(identifier: string) {
+    const key = `login:${identifier}`;
+    const client = this.rateLimitQueue.client;
+    await client.del(key);
   }
 }
-
-

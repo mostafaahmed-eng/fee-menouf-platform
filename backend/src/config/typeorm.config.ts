@@ -1,3 +1,5 @@
+// Used only by TypeORM CLI for migrations (see package.json scripts: migration:generate, migration:run, migration:revert).
+// Not used by the application runtime — the app connects via TypeORM root module config.
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
 

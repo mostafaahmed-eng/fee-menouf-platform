@@ -33,7 +33,7 @@ async function bootstrap() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:', 'https:'],
         fontSrc: ["'self'", 'data:'],
@@ -56,7 +56,7 @@ async function bootstrap() {
     credentials: corsCredentials,
     maxAge: corsMaxAge,
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept-Language', 'X-Requested-With'],
-    exposedHeaders: ['Set-Cookie', 'Authorization'],
+    exposedHeaders: ['Set-Cookie'],
   });
 
   app.useGlobalPipes(

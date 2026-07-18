@@ -60,7 +60,14 @@ export class GradesService {
     const grade = await this.gradeRepo.findOne({ where: { id } });
     if (!grade) throw new NotFoundException('Grade not found');
     if (grade.isPublished) throw new BadRequestException('Cannot update published grade');
-    Object.assign(grade, dto);
+    if (dto.studentId !== undefined) grade.studentId = dto.studentId;
+    if (dto.courseId !== undefined) grade.courseId = dto.courseId;
+    if (dto.semesterId !== undefined) grade.semesterId = dto.semesterId;
+    if (dto.component !== undefined) grade.component = dto.component;
+    if (dto.score !== undefined) grade.score = dto.score;
+    if (dto.maxScore !== undefined) grade.maxScore = dto.maxScore;
+    if (dto.weight !== undefined) grade.weight = dto.weight;
+    if (dto.remarks !== undefined) grade.remarks = dto.remarks;
     const saved = await this.gradeRepo.save(grade);
 
     this.logger.log(`Grade ${id} updated`);

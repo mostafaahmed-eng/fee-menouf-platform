@@ -6,6 +6,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger'
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserFilterDto } from './dto/user-filter.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -35,7 +36,7 @@ export class UsersController {
   @ApiQuery({ name: 'role', required: false })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'isActive', required: false })
-  findAll(@Query() query: any) {
+  findAll(@Query() query: UserFilterDto) {
     return this.usersService.findAll(query);
   }
 

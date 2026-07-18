@@ -27,8 +27,8 @@ export class RegistrationController {
   @Post('drop/:id')
   @Roles(UserRole.STUDENT, UserRole.ADVISOR, UserRole.ADMIN)
   @ApiOperation({ summary: 'Drop a registered course' })
-  drop(@Param('id', ParseUUIDPipe) id: string) {
-    return this.registrationService.dropRegistration(id);
+  drop(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: any) {
+    return this.registrationService.dropRegistration(id, user);
   }
 
   @Get('student/:studentId')

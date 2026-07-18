@@ -97,7 +97,15 @@ export class UsersService {
       }
     }
 
-    Object.assign(user, dto);
+    if (dto.email !== undefined) user.email = dto.email;
+    if (dto.fullNameAr !== undefined) user.fullNameAr = dto.fullNameAr;
+    if (dto.fullNameEn !== undefined) user.fullNameEn = dto.fullNameEn;
+    if (dto.role !== undefined) user.role = dto.role;
+    if (dto.phone !== undefined) user.phone = dto.phone;
+    if (dto.isActive !== undefined) user.isActive = dto.isActive;
+    if (dto.isVerified !== undefined) user.isVerified = dto.isVerified;
+    if (dto.avatar !== undefined) user.avatar = dto.avatar;
+
     return this.sanitizeUser(await this.userRepository.save(user));
   }
 

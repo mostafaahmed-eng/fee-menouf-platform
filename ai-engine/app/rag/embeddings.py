@@ -1,4 +1,5 @@
 import logging
+import collections
 import numpy as np
 from typing import Optional
 from functools import lru_cache
@@ -12,8 +13,9 @@ class EmbeddingService:
     def __init__(self):
         self._local_model = None
         self._openai_client = None
-        self._cache: dict[str, list[float]] = {}
+        self._cache: collections.OrderedDict[str, list[float]] = collections.OrderedDict()
         self._cache_enabled = settings.ENABLE_CACHE
+        self._cache_max_size = 1000
 
     def _get_local_model(self):
         if self._local_model is None:
@@ -87,13 +89,14 @@ class EmbeddingService:
                     embeddings = self._embed_local(texts_to_embed)
                 except Exception as e2:
                     logger.error(f"Fallback embedding also failed: {e2}")
-                    dim = settings.EMBEDDING_DIMENSION
-                    embeddings = [np.zeros(dim).tolist() for _ in texts_to_embed]
+                    raise RuntimeError(f"All embedding methods failed. Primary: {e}, Fallback: {e2}") from e2
 
             for idx, emb in zip(text_indices, embeddings):
                 result_map[idx] = emb
                 if self._cache_enabled:
                     self._cache[texts[idx]] = emb
+                    if len(self._cache) > self._cache_max_size:
+                        self._cache.popitem(last=False)
 
         return [result_map[i] for i in range(len(texts))]
 

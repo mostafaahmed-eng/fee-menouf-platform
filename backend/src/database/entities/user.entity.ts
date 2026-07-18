@@ -64,6 +64,20 @@ export class User {
   @Column({ type: 'varchar', length: 500, nullable: true, name: 'refresh_token' })
   refreshToken: string;
 
+  @Exclude()
+  @Column({ type: 'varchar', length: 500, nullable: true, name: 'password_reset_token' })
+  passwordResetToken: string | null;
+
+  @Column({ type: 'timestamp', nullable: true, name: 'password_reset_expires' })
+  passwordResetExpires: Date | null;
+
+  @Exclude()
+  @Column({ type: 'varchar', length: 500, nullable: true, name: 'email_verification_token' })
+  emailVerificationToken: string | null;
+
+  @Column({ type: 'timestamp', nullable: true, name: 'email_verification_expires' })
+  emailVerificationExpires: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

@@ -1,3 +1,5 @@
+// NOTE: This file appears unused — no package.json scripts or imports reference it.
+// Intended for production migrations (uses dist/ paths), but not wired up.
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
 

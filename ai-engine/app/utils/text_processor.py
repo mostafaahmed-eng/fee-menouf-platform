@@ -81,7 +81,7 @@ def truncate_to_tokens(text: str, max_tokens: int, model: str = "gpt-4-turbo") -
         return " ".join(words[:max_tokens])
 
 
-split_pattern = re.compile(r"(?<=[.?!])\s+|(?<=[\u060C\u061F\u002E])\s+")
+split_pattern = re.compile(r"(?<=[.?!\u061F\u060C\u061B])\s+")
 
 def split_sentences(text: str) -> list[str]:
     sentences = split_pattern.split(text)

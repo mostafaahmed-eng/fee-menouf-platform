@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { CourseRegistration, RegistrationStatus, Student, Course } from '../database/entities';
+import { UserRole } from '../database/entities/user.entity';
 import { RegisterCourseDto } from './dto/register-course.dto';
 
 @Injectable()
@@ -120,9 +121,16 @@ export class RegistrationService {
     };
   }
 
-  async dropRegistration(id: string) {
-    const reg = await this.regRepo.findOne({ where: { id }, relations: ['course'] });
+  async dropRegistration(id: string, currentUser: { id: string; role: UserRole }) {
+    const reg = await this.regRepo.findOne({ where: { id }, relations: ['course', 'student'] });
     if (!reg) throw new NotFoundException('Registration not found');
+
+    if (currentUser.role === UserRole.STUDENT) {
+      if (!reg.student || reg.student.userId !== currentUser.id) {
+        throw new ForbiddenException('You can only drop your own registrations');
+      }
+    }
+
     if (reg.status === RegistrationStatus.DROPPED) {
       throw new BadRequestException('Already dropped');
     }

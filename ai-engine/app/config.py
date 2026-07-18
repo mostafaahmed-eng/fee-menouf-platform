@@ -8,10 +8,10 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     OPENAI_API_KEY: str = ""
-    PRIMARY_MODEL: str = "gpt-4-turbo"
     FALLBACK_MODEL: str = "gpt-3.5-turbo"
     OFFLINE_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
     MODEL_NAME: str = "gpt-4-turbo"

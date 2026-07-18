@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindOptionsWhere } from 'typeorm';
 import { Notification, NotificationType } from '../database/entities/notification.entity';
+import { User, UserRole } from '../database/entities/user.entity';
 import { paginate, PaginatedResult, getPaginationParams, getSkipTake } from '../common/utils/pagination';
 
 interface FindNotificationsQuery {
@@ -47,8 +48,11 @@ export class NotificationsService {
     return notification;
   }
 
-  async markAsRead(id: string): Promise<Notification> {
+  async markAsRead(id: string, currentUser: User): Promise<Notification> {
     const notification = await this.findOne(id);
+    if (currentUser.role === UserRole.STUDENT && notification.userId !== currentUser.id) {
+      throw new ForbiddenException('You can only modify your own notifications');
+    }
     notification.isRead = true;
     return this.notificationRepository.save(notification);
   }
@@ -65,7 +69,11 @@ export class NotificationsService {
     return this.notificationRepository.count({ where: { userId, isRead: false } });
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, currentUser: User): Promise<void> {
+    const notification = await this.findOne(id);
+    if (currentUser.role === UserRole.STUDENT && notification.userId !== currentUser.id) {
+      throw new ForbiddenException('You can only delete your own notifications');
+    }
     const result = await this.notificationRepository.delete(id);
     if (result.affected === 0) throw new NotFoundException('Notification not found');
   }

@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, FindOptionsWhere } from 'typeorm';
 import { Student, StudentStatus } from '../database/entities/student.entity';
+import { UserRole } from '../database/entities/user.entity';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { paginate, PaginatedResult, getPaginationParams, getSkipTake } from '../common/utils/pagination';
@@ -101,12 +102,20 @@ export class StudentsService {
 
   async update(id: string, dto: UpdateStudentDto): Promise<Student> {
     const student = await this.findOne(id);
-    Object.assign(student, dto);
+    if (dto.level !== undefined) student.level = dto.level;
+    if (dto.status !== undefined) student.status = dto.status;
+    if (dto.departmentId !== undefined) student.departmentId = dto.departmentId;
+    if (dto.programId !== undefined) student.programId = dto.programId;
+    if (dto.academicYearId !== undefined) student.academicYearId = dto.academicYearId;
+    if (dto.semesterId !== undefined) student.semesterId = dto.semesterId;
     return this.studentRepository.save(student);
   }
 
-  async getGrades(studentId: string) {
+  async getGrades(studentId: string, currentUser?: { id: string; role: UserRole }) {
     const student = await this.findOne(studentId);
+    if (currentUser?.role === UserRole.STUDENT && student.userId !== currentUser.id) {
+      throw new ForbiddenException('You can only view your own grades');
+    }
     const { Grade } = await import('../database/entities/grade.entity');
     const gradesRepo = this.studentRepository.manager.getRepository(Grade);
     return gradesRepo.find({
@@ -116,8 +125,11 @@ export class StudentsService {
     });
   }
 
-  async getAttendance(studentId: string) {
+  async getAttendance(studentId: string, currentUser?: { id: string; role: UserRole }) {
     const student = await this.findOne(studentId);
+    if (currentUser?.role === UserRole.STUDENT && student.userId !== currentUser.id) {
+      throw new ForbiddenException('You can only view your own attendance');
+    }
     const { Attendance } = await import('../database/entities/attendance.entity');
     const attendanceRepo = this.studentRepository.manager.getRepository(Attendance);
     return attendanceRepo.find({
@@ -127,8 +139,11 @@ export class StudentsService {
     });
   }
 
-  async getRegistrations(studentId: string) {
+  async getRegistrations(studentId: string, currentUser?: { id: string; role: UserRole }) {
     const student = await this.findOne(studentId);
+    if (currentUser?.role === UserRole.STUDENT && student.userId !== currentUser.id) {
+      throw new ForbiddenException('You can only view your own registrations');
+    }
     const { CourseRegistration } = await import('../database/entities/course-registration.entity');
     const regRepo = this.studentRepository.manager.getRepository(CourseRegistration);
     return regRepo.find({

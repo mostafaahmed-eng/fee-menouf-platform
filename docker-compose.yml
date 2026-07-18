@@ -15,6 +15,8 @@ volumes:
     driver: local
   backend_node_modules:
     driver: local
+  chromadb_data:
+    driver: local
 
 x-logging: &default-logging
   driver: "json-file"
@@ -141,6 +143,8 @@ services:
     container_name: fee-menouf-backend
     ports:
       - "${BACKEND_PORT:-4000}:4000"
+    # SECURITY NOTE: env_file exposes ALL 60+ .env vars to this container.
+    # In production, use explicit environment entries instead of env_file.
     env_file:
       - .env
     environment:
@@ -193,6 +197,8 @@ services:
     container_name: fee-menouf-frontend
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
+    # SECURITY NOTE: env_file exposes ALL 60+ .env vars to this container.
+    # In production, use explicit environment entries instead of env_file.
     env_file:
       - .env
     environment:
@@ -226,6 +232,8 @@ services:
     container_name: fee-menouf-ai-engine
     ports:
       - "${AI_ENGINE_PORT:-8000}:8000"
+    # SECURITY NOTE: env_file exposes ALL 60+ .env vars to this container.
+    # In production, use explicit environment entries instead of env_file.
     env_file:
       - .env
     environment:
@@ -235,6 +243,8 @@ services:
       DB_PORT: 5432
       REDIS_HOST: redis
       REDIS_PORT: 6379
+    volumes:
+      - chromadb_data:/app/data/chromadb
     depends_on:
       postgres:
         condition: service_healthy
