@@ -82,6 +82,118 @@ Advanced courses in the specialization field.
 ### Fifth Year - Graduation Project and Application
 Includes applied courses, graduation project, and field training.
 
+## Student Portal Guide
+
+### How to Access the Student Portal
+1. Open your browser and go to: https://portal.fee.menofia.edu.eg
+2. Enter your student ID and password
+3. Click "Login"
+
+### Key Portal Features
+- **View Grades:** Access your grades for all courses
+- **Course Registration:** Register, drop, and add courses
+- **View Schedule:** Check your lecture timetable
+- **Attendance Rate:** Track your attendance for each course
+- **Messages:** Communicate with administration and academic advisors
+- **Student ID Card:** Request a new or replacement ID card
+
+### How to Check Your Grades
+1. Log in to the student portal
+2. Select "Grades" from the main menu
+3. Choose the desired semester
+4. Your grades will be displayed along with semester GPA and cumulative GPA
+
+### How to Register for Courses
+1. Log in to the student portal
+2. Select "Course Registration"
+3. Choose your desired courses from the available list
+4. Verify that you meet all prerequisites
+5. Click "Confirm Registration"
+6. Review your final schedule
+
+### How to Check Your Attendance
+1. Log in to the student portal
+2. Select "Attendance" from the main menu
+3. Choose the specific course
+4. You will see your attendance percentage and absence details
+
+### How to Contact Your Academic Advisor
+1. From the student portal, select "Academic Advisor"
+2. View your advisor's details (name, office, email, consultation hours)
+3. You can book an electronic appointment or send a direct message
+
+## Requesting Official Transcripts
+
+### Types of Academic Transcripts
+- **Official Transcript:** For job applications or graduate studies
+- **Unofficial Transcript:** For personal reference
+
+### How to Request a Transcript
+1. Submit a request to Student Affairs office
+2. Pay the required fee (50 EGP)
+3. Transcript is issued within 3-5 business days
+4. Collect from Student Affairs office
+
+## Campus Map and Locations
+
+### Main Buildings
+- **Main Building:** Administrative offices and main lecture hall
+- **Science Building:** Laboratories and classrooms
+- **Engineering Building:** Engineering labs and workshops
+- **Library:** Central library
+- **Cafeteria:** Food and beverages
+
+### Laboratories and Workshops
+- Computer Lab (Science Building - 2nd Floor)
+- Electronics Lab (Engineering Building - 1st Floor)
+- Communications Lab (Engineering Building - 2nd Floor)
+- Power Lab (Engineering Building - 3rd Floor)
+- Biomedical Engineering Lab (Science Building - 1st Floor)
+- Robotics Lab (Engineering Building - 4th Floor)
+
+### Important Locations
+- Student Affairs Office (Main Building - 1st Floor)
+- Academic Advising Office (Main Building - 2nd Floor)
+- Dean's Office (Main Building - 3rd Floor)
+- Admissions and Registration Office (Main Building - 1st Floor)
+
+## Library Services
+
+### Working Hours
+- Saturday to Thursday: 8 AM to 8 PM
+- Friday: Closed
+
+### Available Services
+- Book and reference lending
+- Access to electronic journals
+- Group study rooms
+- Individual reading rooms
+- Printing and copying services
+- Access to scientific databases (IEEE, Springer, Elsevier)
+
+### How to Borrow a Book
+1. Search for the book in the library's electronic catalog
+2. Check book availability
+3. Go to the book shelf in the library
+4. Register borrowing at the circulation desk
+5. Loan period: 14 days (renewable once)
+
+## Career Services
+
+### Available Services
+- Resume/CV preparation
+- Interview training
+- Annual career fair
+- Summer internship programs
+- Company and institution networking
+- Professional workshops
+
+### How to Access Career Services
+1. Register at the Career Services office
+2. Attend training workshops
+3. Participate in the career fair
+4. Submit an internship application
+
 ## Academic Advising
 
 ### The Role of the Academic Advisor
@@ -133,8 +245,9 @@ The faculty adheres to the following academic values:
 - Transparency in assessment
 - Mutual respect between students and faculty members
 
-Contact the faculty administration:
+## Contact Information
 Location: Shebin El-Kom - Cairo-Alexandria Agricultural Road
 Phone: 048-1234567
 Email: info@fee.menofia.edu.eg
 Website: www.fee.menofia.edu.eg
+Working Hours: Saturday to Thursday, 8 AM to 3 PM

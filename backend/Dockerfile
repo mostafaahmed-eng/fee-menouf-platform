@@ -4,12 +4,23 @@ FROM node:${NODE_VERSION} AS builder
 
 WORKDIR /app
 
-COPY package.json ./
+COPY package.json package-lock.json* ./
 RUN npm install
 
 COPY tsconfig*.json nest-cli.json ./
 COPY src/ src/
 RUN npm run build
+
+# -----------------------------------------------------------------------------
+
+FROM node:${NODE_VERSION} AS deps
+
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN apk add --no-cache python3 make g++ && \
+    npm install --omit=dev && \
+    apk del python3 make g++
 
 # -----------------------------------------------------------------------------
 
@@ -24,8 +35,8 @@ WORKDIR /app
 RUN apk add --no-cache curl
 
 # Copy production dependencies and build artifacts
-COPY --from=builder /app/package.json ./
-RUN npm install --only=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json ./
 COPY --from=builder /app/dist ./dist
 
 # Create non-root user

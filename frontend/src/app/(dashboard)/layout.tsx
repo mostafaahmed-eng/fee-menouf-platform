@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Navbar } from "@/components/layout/navbar";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/lib/hooks/use-media-query";
 import { useTranslation } from "@/lib/i18n/use-translation";
@@ -62,7 +63,7 @@ export default function DashboardLayout({
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                {children}
+                <ErrorBoundary>{children}</ErrorBoundary>
               </motion.div>
             </AnimatePresence>
           </div>

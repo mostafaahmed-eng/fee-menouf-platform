@@ -1,0 +1,128 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  namespace: fee-menouf
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/part-of: fee-menouf-platform
+    app.kubernetes.io/component: storage
+spec:
+  serviceName: minio-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+      app.kubernetes.io/part-of: fee-menouf-platform
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: minio
+        app.kubernetes.io/part-of: fee-menouf-platform
+        app.kubernetes.io/component: storage
+    spec:
+      serviceAccountName: minio-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        runAsGroup: 1000
+      containers:
+        - name: minio
+          image: minio/minio:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - minio
+            - server
+            - /data
+            - --console-address
+            - ":9001"
+          ports:
+            - containerPort: 9000
+              name: minio-api
+              protocol: TCP
+            - containerPort: 9001
+              name: minio-console
+              protocol: TCP
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: fee-menouf-secrets
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fee-menouf-secrets
+                  key: MINIO_ROOT_PASSWORD
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: minio-data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
+          startupProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 15
+  volumeClaimTemplates:
+    - metadata:
+        name: minio-data
+        labels:
+          app.kubernetes.io/name: minio
+          app.kubernetes.io/part-of: fee-menouf-platform
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+        storageClassName: ""
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+  namespace: fee-menouf
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/part-of: fee-menouf-platform
+    app.kubernetes.io/component: storage
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/part-of: fee-menouf-platform
+  ports:
+    - name: minio-api
+      port: 9000
+      targetPort: minio-api
+      protocol: TCP
+    - name: minio-console
+      port: 9001
+      targetPort: minio-console
+      protocol: TCP

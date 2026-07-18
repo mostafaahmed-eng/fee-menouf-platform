@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-engine
+  namespace: fee-menouf
+  labels:
+    app.kubernetes.io/name: ai-engine
+    app.kubernetes.io/part-of: fee-menouf-platform
+    app.kubernetes.io/component: ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-engine
+      app.kubernetes.io/part-of: fee-menouf-platform
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ai-engine
+        app.kubernetes.io/part-of: fee-menouf-platform
+        app.kubernetes.io/component: ai
+    spec:
+      serviceAccountName: ai-engine-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        runAsGroup: 1000
+      containers:
+        - name: ai-engine
+          image: fee-menouf/ai-engine:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: fee-menouf-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fee-menouf-secrets
+                  key: DB_PASS
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: fee-menouf-secrets
+                  key: REDIS_PASSWORD
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: fee-menouf-secrets
+                  key: OPENAI_API_KEY
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 30
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - "sleep 10"
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-engine-service
+  namespace: fee-menouf
+  labels:
+    app.kubernetes.io/name: ai-engine
+    app.kubernetes.io/part-of: fee-menouf-platform
+    app.kubernetes.io/component: ai
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ai-engine
+    app.kubernetes.io/part-of: fee-menouf-platform
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP

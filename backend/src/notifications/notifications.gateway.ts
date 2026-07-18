@@ -2,6 +2,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
   SubscribeMessage,
+  OnGatewayInit,
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
@@ -21,11 +22,10 @@ interface AuthenticatedSocket extends Socket {
   namespace: '/notifications',
   cors: {
     origin: (origin, callback) => {
-      const allowedOrigins = [
-        'http://localhost:3000',
-        'http://localhost:8888',
-        'http://localhost:4000',
-      ];
+      const envOrigins = process.env.CORS_ORIGINS;
+      const allowedOrigins = envOrigins
+        ? envOrigins.split(',').map((o) => o.trim())
+        : ['http://localhost:3000'];
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
@@ -35,7 +35,9 @@ interface AuthenticatedSocket extends Socket {
     credentials: true,
   },
 })
-export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class NotificationsGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   private readonly logger = new Logger(NotificationsGateway.name);
   private userSockets = new Map<string, Set<string>>();
 
@@ -44,10 +46,16 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
 
   constructor(private readonly configService: ConfigService) {}
 
+  afterInit(): void {
+    const corsOrigins = this.configService.get<string[]>('app.corsOrigins') || ['http://localhost:3000'];
+    this.logger.log(`WebSocket CORS origins configured: ${corsOrigins.join(', ')}`);
+  }
+
   handleConnection(client: AuthenticatedSocket): void {
     try {
-      const token = client.handshake.auth?.token
-        || client.handshake.query?.token as string;
+      const token =
+        client.handshake.auth?.token ||
+        (client.handshake.query?.token as string);
 
       if (!token) {
         this.logger.warn(`Client ${client.id} rejected: No token provided`);
@@ -62,7 +70,10 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
         return;
       }
 
-      const payload = jwt.verify(token, jwtSecret) as { sub: string; role: string };
+      const payload = jwt.verify(token, jwtSecret) as {
+        sub: string;
+        role: string;
+      };
       const userId = payload.sub;
 
       client.data.userId = userId;

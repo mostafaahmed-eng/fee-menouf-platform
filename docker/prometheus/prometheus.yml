@@ -27,7 +27,7 @@ scrape_configs:
         replacement: "fee-menouf-backend"
     metric_relabel_configs:
       - source_labels: [__name__]
-        regex: "(http_request_duration_seconds|http_requests_total|process_cpu_seconds_total|process_resident_memory_bytes|nodejs_heap_size_used_bytes|nodejs_heap_size_total_bytes|db_query_duration_seconds|redis_operation_duration_seconds)"
+        regex: "(http_request_duration_seconds_bucket|http_request_duration_seconds_sum|http_request_duration_seconds_count|http_requests_total|process_cpu_seconds_total|process_resident_memory_bytes|nodejs_heap_size_used_bytes|nodejs_heap_size_total_bytes|nodejs_active_handles_total|db_query_duration_seconds_bucket|redis_operation_duration_seconds_bucket|openmetrics_metric_name)"
         action: keep
 
   - job_name: "frontend"
@@ -39,6 +39,10 @@ scrape_configs:
       - source_labels: [__address__]
         target_label: instance
         replacement: "fee-menouf-frontend"
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: "(http_request_duration_seconds_bucket|http_requests_total|nextjs_build_info|process_resident_memory_bytes)"
+        action: keep
 
   - job_name: "ai-engine"
     metrics_path: "/metrics"
@@ -51,7 +55,7 @@ scrape_configs:
         replacement: "fee-menouf-ai-engine"
     metric_relabel_configs:
       - source_labels: [__name__]
-        regex: "(python_info|process_cpu_seconds_total|process_resident_memory_bytes|http_request_duration_seconds|http_requests_total|ai_inference_duration_seconds|rag_retrieval_duration_seconds|embedding_duration_seconds|scheduler_execution_total)"
+        regex: "(python_info|process_cpu_seconds_total|process_resident_memory_bytes|http_request_duration_seconds_bucket|http_requests_total|ai_inference_duration_seconds_bucket|rag_retrieval_duration_seconds_bucket|embedding_duration_seconds_bucket|scheduler_execution_total|uvicorn_request_duration_seconds_bucket)"
         action: keep
 
   - job_name: "postgres"

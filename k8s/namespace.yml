@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fee-menouf
+  labels:
+    app.kubernetes.io/part-of: fee-menouf-platform
+    app.kubernetes.io/managed-by: kubectl

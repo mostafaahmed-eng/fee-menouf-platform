@@ -7,18 +7,36 @@ import { MarkAttendanceDto } from './dto/mark-attendance.dto';
 import { MarkAttendanceBatchDto } from './dto/mark-attendance-batch.dto';
 import { QrAttendanceDto } from './dto/qr-attendance.dto';
 import { GeolocationAttendanceDto } from './dto/geolocation-attendance.dto';
+import {
+  generateSignedQrPayload,
+  encodeQrPayload,
+  decodeQrPayload,
+  verifyQrPayload,
+} from './utils/qr-signer';
 
 @Injectable()
 export class AttendanceService {
   private readonly logger = new Logger(AttendanceService.name);
   private readonly EARTH_RADIUS_KM = 6371;
+  private readonly usedNonces = new Map<string, number>();
 
   constructor(
     @InjectRepository(Attendance)
     private readonly attendanceRepo: Repository<Attendance>,
     @InjectRepository(Lecture)
     private readonly lectureRepo: Repository<Lecture>,
-  ) {}
+  ) {
+    setInterval(() => this.cleanupExpiredNonces(), 60 * 1000);
+  }
+
+  private cleanupExpiredNonces(): void {
+    const now = Date.now();
+    for (const [nonce, expiresAt] of this.usedNonces) {
+      if (now > expiresAt) {
+        this.usedNonces.delete(nonce);
+      }
+    }
+  }
 
   async markAttendance(dto: MarkAttendanceDto, markedBy?: string): Promise<Attendance> {
     const lecture = await this.lectureRepo.findOne({ where: { id: dto.lectureId } });
@@ -101,32 +119,35 @@ export class AttendanceService {
   }
 
   async markQrAttendance(dto: QrAttendanceDto, studentId: string): Promise<Attendance> {
-    const lecture = await this.lectureRepo.findOne({ where: { id: dto.lectureId } });
+    const signedPayload = decodeQrPayload(dto.qrCode);
+
+    const verification = verifyQrPayload(signedPayload);
+    if (!verification.valid) {
+      throw new ForbiddenException(verification.reason);
+    }
+
+    if (this.usedNonces.has(signedPayload.nonce)) {
+      throw new BadRequestException('QR code has already been used');
+    }
+
+    const lecture = await this.lectureRepo.findOne({ where: { id: signedPayload.lectureId } });
     if (!lecture) throw new NotFoundException('Lecture not found');
 
     if (!lecture.qrCode || !lecture.qrExpiresAt) {
       throw new BadRequestException('No active QR code for this lecture');
     }
 
-    if (lecture.qrExpiresAt < new Date()) {
-      throw new BadRequestException('QR code has expired');
-    }
-
-    const decoded = Buffer.from(dto.qrCode, 'base64').toString('utf-8');
-    const payload = JSON.parse(decoded);
-    if (payload.lectureId !== dto.lectureId) {
-      throw new ForbiddenException('Invalid QR code for this lecture');
-    }
-
     const existing = await this.attendanceRepo.findOne({
-      where: { studentId, lectureId: dto.lectureId },
+      where: { studentId, lectureId: signedPayload.lectureId },
     });
     if (existing) throw new BadRequestException('Attendance already marked');
 
+    this.usedNonces.set(signedPayload.nonce, signedPayload.expiresAt);
+
     const attendance = this.attendanceRepo.create({
       studentId,
-      courseId: lecture.courseId,
-      lectureId: dto.lectureId,
+      courseId: signedPayload.courseId,
+      lectureId: signedPayload.lectureId,
       status: AttendanceStatus.PRESENT,
       method: AttendanceMethod.QR,
       date: new Date(),
@@ -134,7 +155,7 @@ export class AttendanceService {
 
     const saved = await this.attendanceRepo.save(attendance);
 
-    this.logger.log(`QR attendance marked for student ${studentId} in lecture ${dto.lectureId}`);
+    this.logger.log(`QR attendance marked for student ${studentId} in lecture ${signedPayload.lectureId}`);
 
     return saved;
   }
@@ -195,10 +216,11 @@ export class AttendanceService {
     const lecture = await this.lectureRepo.findOne({ where: { id: lectureId } });
     if (!lecture) throw new NotFoundException('Lecture not found');
 
-    const payload = JSON.stringify({ id: lecture.id, lectureId, courseId: lecture.courseId, timestamp: new Date().toISOString() });
-    const encoded = Buffer.from(payload).toString('base64');
+    const validMinutes = 5;
+    const signedPayload = generateSignedQrPayload(lecture.id, lecture.courseId, validMinutes);
+    const encoded = encodeQrPayload(signedPayload);
     const qrCodeDataUrl = await QRCode.toDataURL(encoded);
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    const expiresAt = new Date(signedPayload.expiresAt);
 
     lecture.qrCode = encoded;
     lecture.qrExpiresAt = expiresAt;

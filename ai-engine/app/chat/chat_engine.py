@@ -10,49 +10,14 @@ from app.chat.context_builder import context_builder
 from app.chat.rule_based import rule_based_ai
 from app.utils.text_processor import detect_language, count_tokens
 from app.utils.rate_limiter import get_rate_limiter
+from app.chat.session_store import SessionStore
 
 logger = logging.getLogger("ai_engine.chat_engine")
 
-
-class SessionStore:
-    def __init__(self):
-        self._sessions: dict[str, dict] = {}
-
-    def get_or_create(self, session_id: str) -> dict:
-        if session_id not in self._sessions:
-            self._sessions[session_id] = {
-                "history": [],
-                "created_at": datetime.utcnow().isoformat(),
-                "token_usage": {"prompt": 0, "completion": 0, "total": 0},
-            }
-        return self._sessions[session_id]
-
-    def get_history(self, session_id: str) -> list:
-        session = self.get_or_create(session_id)
-        return session["history"]
-
-    def add_message(self, session_id: str, role: str, content: str, tokens: int = 0):
-        session = self.get_or_create(session_id)
-        session["history"].append({
-            "role": role,
-            "content": content,
-            "timestamp": datetime.utcnow().isoformat(),
-            "tokens": tokens,
-        })
-
-    def clear_history(self, session_id: str):
-        if session_id in self._sessions:
-            self._sessions[session_id]["history"] = []
-
-    def update_token_usage(self, session_id: str, prompt_tokens: int, completion_tokens: int):
-        session = self.get_or_create(session_id)
-        session["token_usage"]["prompt"] += prompt_tokens
-        session["token_usage"]["completion"] += completion_tokens
-        session["token_usage"]["total"] += prompt_tokens + completion_tokens
-
-
 session_store = SessionStore()
 rate_limiter = get_rate_limiter()
+
+CONVERSATION_SUMMARY_THRESHOLD = 20
 
 
 class ChatEngine:
@@ -71,6 +36,75 @@ class ChatEngine:
     def _get_system_prompt(self, language: str) -> str:
         return SYSTEM_PROMPT_AR if language == "ar" else SYSTEM_PROMPT_EN
 
+    def _build_source_citations(self, retrieved_docs: list[dict]) -> str:
+        if not retrieved_docs:
+            return ""
+
+        citations = []
+        seen_sources = set()
+        for doc in retrieved_docs:
+            metadata = doc.get("metadata", {})
+            source = metadata.get("source", "unknown")
+            if source not in seen_sources:
+                seen_sources.add(source)
+                filename = source.split("/")[-1] if "/" in source else source
+                filename = filename.replace(".md", "").replace(".txt", "").replace(".pdf", "")
+                label = filename.replace("-", " ").replace("_", " ").title()
+                citations.append(f"[Source: {label}]")
+
+        return "\n".join(citations) if citations else ""
+
+    async def _summarize_conversation(self, messages: list[dict], language: str) -> str:
+        client = self._get_openai_client()
+        if not client:
+            return self._fallback_summarize(messages, language)
+
+        older_messages = messages[:-10]
+        formatted = "\n".join(
+            f"{m['role'].upper()}: {m['content']}" for m in older_messages
+        )
+
+        lang_instruction = (
+            "لخص المحادثة التالية بالعربية في فقرة واحدة موجزة."
+            if language == "ar"
+            else "Summarize the following conversation in one concise paragraph."
+        )
+
+        try:
+            response = await client.chat.completions.create(
+                model=settings.MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": lang_instruction},
+                    {"role": "user", "content": formatted},
+                ],
+                max_tokens=300,
+                temperature=0.3,
+            )
+            return response.choices[0].message.content or ""
+        except Exception as e:
+            logger.error(f"Conversation summarization failed: {e}")
+            return self._fallback_summarize(messages, language)
+
+    def _fallback_summarize(self, messages: list[dict], language: str) -> str:
+        topics = set()
+        for msg in messages:
+            content = msg.get("content", "").lower()
+            keywords = [
+                "gpa", "معدل", "attendance", "حضور", "register", "تسجيل",
+                "exam", "امتحان", "course", "مقرر", "graduate", "تخرج",
+                "prerequisite", "متطلب", "transfer", "نقل",
+            ]
+            for kw in keywords:
+                if kw in content:
+                    topics.add(kw)
+
+        if language == "ar":
+            topics_str = "، ".join(topics) if topics else "_topics"
+            return f"المحادثة تناولت المواضيع التالية: {topics_str}"
+        else:
+            topics_str = ", ".join(topics) if topics else "various topics"
+        return f"The conversation covered the following topics: {topics_str}"
+
     def _build_messages(
         self,
         query: str,
@@ -78,20 +112,60 @@ class ChatEngine:
         history: list,
         language: str,
         system_override: Optional[str] = None,
+        retrieved_docs: Optional[list[dict]] = None,
     ) -> list[dict]:
         system_content = system_override or self._get_system_prompt(language)
 
         if context:
-            system_content += f"\n\n## Knowledge Base Context\n{context}"
+            citations = self._build_source_citations(retrieved_docs or [])
+            context_section = f"\n\n## Knowledge Base Context\n{context}"
+            if citations:
+                context_section += f"\n\n{citations}"
+            system_content += context_section
 
         messages = [{"role": "system", "content": system_content}]
 
-        for msg in history[-10:]:
+        if len(history) > CONVERSATION_SUMMARY_THRESHOLD:
+            summary = self._get_cached_summary(history, language)
+            if summary:
+                if language == "ar":
+                    summary_msg = f"[ملخص المحادثة السابقة]: {summary}"
+                else:
+                    summary_msg = f"[Previous conversation summary]: {summary}"
+                messages.append({"role": "system", "content": summary_msg})
+
+        recent_start = max(0, len(history) - 10)
+        for msg in history[recent_start:]:
             messages.append({"role": msg["role"], "content": msg["content"]})
 
         messages.append({"role": "user", "content": query})
 
         return messages
+
+    def _get_cached_summary(self, history: list[dict], language: str) -> Optional[str]:
+        if not hasattr(self, "_summary_cache"):
+            self._summary_cache = {}
+
+        history_hash = hash(tuple((m["role"], m["content"][:50]) for m in history[:-10]))
+        cache_key = f"{history_hash}_{language}"
+
+        if cache_key in self._summary_cache:
+            return self._summary_cache[cache_key]
+
+        return None
+
+    def _cache_summary(self, history: list[dict], language: str, summary: str):
+        if not hasattr(self, "_summary_cache"):
+            self._summary_cache = {}
+
+        history_hash = hash(tuple((m["role"], m["content"][:50]) for m in history[:-10]))
+        cache_key = f"{history_hash}_{language}"
+        self._summary_cache[cache_key] = summary
+
+        if len(self._summary_cache) > 100:
+            oldest_keys = list(self._summary_cache.keys())[:50]
+            for key in oldest_keys:
+                del self._summary_cache[key]
 
     async def send_message(
         self,
@@ -109,12 +183,18 @@ class ChatEngine:
         )
 
         history = session_store.get_history(session_id)
+
+        if len(history) > CONVERSATION_SUMMARY_THRESHOLD and not self._get_cached_summary(history, language):
+            summary = await self._summarize_conversation(history, language)
+            self._cache_summary(history, language, summary)
+
         messages = self._build_messages(
             query=query,
             context=built_context["context"],
             history=history,
             language=language,
             system_override=system_prompt_override,
+            retrieved_docs=built_context.get("retrieved_docs", []),
         )
 
         prompt_tokens = sum(count_tokens(m["content"]) for m in messages)
@@ -136,6 +216,8 @@ class ChatEngine:
                 session_store.add_message(session_id, "assistant", answer, completion_tokens)
                 session_store.update_token_usage(session_id, prompt_tokens, completion_tokens)
 
+                sources = self._format_sources_for_response(built_context.get("retrieved_docs", []))
+
                 return {
                     "answer": answer,
                     "session_id": session_id,
@@ -145,7 +227,7 @@ class ChatEngine:
                         "completion": completion_tokens,
                         "total": total_tokens,
                     },
-                    "sources": built_context["retrieved_docs"],
+                    "sources": sources,
                 }
 
             except Exception as e:
@@ -161,9 +243,27 @@ class ChatEngine:
             "session_id": session_id,
             "language": language,
             "token_usage": {"prompt": prompt_tokens, "completion": 0, "total": prompt_tokens},
-            "sources": built_context["retrieved_docs"],
+            "sources": [],
             "fallback": True,
         }
+
+    def _format_sources_for_response(self, retrieved_docs: list[dict]) -> list[dict]:
+        sources = []
+        seen = set()
+        for doc in retrieved_docs:
+            metadata = doc.get("metadata", {})
+            source = metadata.get("source", "unknown")
+            if source not in seen:
+                seen.add(source)
+                filename = source.split("/")[-1] if "/" in source else source
+                filename = filename.replace(".md", "").replace(".txt", "").replace(".pdf", "")
+                label = filename.replace("-", " ").replace("_", " ").title()
+                sources.append({
+                    "source": source,
+                    "label": label,
+                    "chunk_text_preview": doc.get("text", "")[:150],
+                })
+        return sources
 
     async def send_message_stream(
         self,
@@ -180,11 +280,17 @@ class ChatEngine:
         )
 
         history = session_store.get_history(session_id)
+
+        if len(history) > CONVERSATION_SUMMARY_THRESHOLD and not self._get_cached_summary(history, language):
+            summary = await self._summarize_conversation(history, language)
+            self._cache_summary(history, language, summary)
+
         messages = self._build_messages(
             query=query,
             context=built_context["context"],
             history=history,
             language=language,
+            retrieved_docs=built_context.get("retrieved_docs", []),
         )
 
         session_store.add_message(session_id, "user", query, 0)
@@ -207,7 +313,8 @@ class ChatEngine:
                         yield f"data: {json.dumps({'content': delta})}\n\n"
 
                 session_store.add_message(session_id, "assistant", full_answer, count_tokens(full_answer))
-                yield f"data: {json.dumps({'done': True, 'session_id': session_id})}\n\n"
+                sources = self._format_sources_for_response(built_context.get("retrieved_docs", []))
+                yield f"data: {json.dumps({'done': True, 'session_id': session_id, 'sources': sources})}\n\n"
                 return
 
             except Exception as e:

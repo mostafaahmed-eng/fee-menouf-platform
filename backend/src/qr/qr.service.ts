@@ -5,6 +5,12 @@ import * as QRCode from 'qrcode';
 import { v4 as uuidv4 } from 'uuid';
 import { Student } from '../database/entities/student.entity';
 import { Lecture } from '../database/entities/lecture.entity';
+import {
+  generateSignedQrPayload,
+  encodeQrPayload,
+  decodeQrPayload,
+  verifyQrPayload,
+} from '../attendance/utils/qr-signer';
 
 interface QrCodeData {
   id: string;
@@ -32,50 +38,55 @@ export class QrService {
     });
     if (!lecture) throw new BadRequestException('Lecture not found');
 
-    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
-    const qrData: QrCodeData = {
-      id: uuidv4(),
-      type: 'lecture_attendance',
-      data: {
-        lectureId: lecture.id,
-        courseCode: lecture.course?.code,
-        date: lecture.createdAt.toISOString().split('T')[0],
-        startTime: lecture.startTime,
-      },
-      expiresAt: expiresAt.toISOString(),
-    };
+    const signedPayload = generateSignedQrPayload(lecture.id, lecture.courseId, expiryMinutes);
+    const encoded = encodeQrPayload(signedPayload);
+    const qrImage = await QRCode.toDataURL(encoded);
 
-    this.qrSecrets.set(qrData.id, qrData);
-    const qrImage = await QRCode.toDataURL(JSON.stringify(qrData));
-
-    lecture.qrCode = qrData.id;
-    lecture.qrExpiresAt = expiresAt;
+    lecture.qrCode = encoded;
+    lecture.qrExpiresAt = new Date(signedPayload.expiresAt);
     await this.lectureRepo.save(lecture);
 
-    return { qrCode: qrData.id, qrImage };
+    return { qrCode: signedPayload.nonce, qrImage };
   }
 
   async validateQr(qrCodeId: string, studentId?: string): Promise<{ valid: boolean; message: string; data?: any }> {
-    const qrData = this.qrSecrets.get(qrCodeId);
-
-    if (!qrData) {
-      const lecture = await this.lectureRepo.findOne({ where: { qrCode: qrCodeId } });
-      if (!lecture) {
-        return { valid: false, message: 'Invalid QR code' };
-      }
+    const lecture = await this.lectureRepo.findOne({ where: { qrCode: qrCodeId } });
+    if (lecture) {
       if (lecture.qrExpiresAt && new Date(lecture.qrExpiresAt) < new Date()) {
         return { valid: false, message: 'QR code has expired' };
       }
-      return {
-        valid: true,
-        message: 'QR code is valid',
-        data: {
-          lectureId: lecture.id,
-          courseId: lecture.courseId,
-          startTime: lecture.startTime,
-          endTime: lecture.endTime,
-        },
-      };
+
+      try {
+        const payload = decodeQrPayload(qrCodeId);
+        const verification = verifyQrPayload(payload);
+        if (!verification.valid) {
+          return { valid: false, message: verification.reason || 'Invalid QR code' };
+        }
+        return {
+          valid: true,
+          message: 'QR code is valid',
+          data: {
+            lectureId: payload.lectureId,
+            courseId: payload.courseId,
+          },
+        };
+      } catch {
+        return {
+          valid: true,
+          message: 'QR code is valid',
+          data: {
+            lectureId: lecture.id,
+            courseId: lecture.courseId,
+            startTime: lecture.startTime,
+            endTime: lecture.endTime,
+          },
+        };
+      }
+    }
+
+    const qrData = this.qrSecrets.get(qrCodeId);
+    if (!qrData) {
+      return { valid: false, message: 'Invalid QR code' };
     }
 
     if (qrData.expiresAt && new Date(qrData.expiresAt) < new Date()) {

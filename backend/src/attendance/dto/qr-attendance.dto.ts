@@ -2,11 +2,11 @@ import { IsUUID, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class QrAttendanceDto {
-  @ApiProperty()
+  @ApiProperty({ required: false })
   @IsUUID()
   lectureId: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'HMAC-signed QR payload encoded as base64url' })
   @IsString()
   qrCode: string;
 }

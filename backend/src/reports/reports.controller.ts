@@ -1,4 +1,5 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -45,12 +46,18 @@ export class ReportsController {
   }
 
   @Get('export/:type')
-  @ApiOperation({ summary: 'Export report as CSV or HTML' })
+  @ApiOperation({ summary: 'Export report as CSV or PDF' })
   @ApiQuery({ name: 'format', required: true, enum: ['csv', 'pdf'] })
   async exportReport(
     @Param('type') type: string,
     @Query('format') format: 'csv' | 'pdf',
+    @Res() res: Response,
   ) {
-    return this.reportsService.exportReport(type, format);
+    const result = await this.reportsService.exportReport(type, format);
+    res.set({
+      'Content-Type': result.contentType,
+      'Content-Disposition': `attachment; filename="${result.filename}"`,
+    });
+    res.send(result.content);
   }
 }

@@ -9,6 +9,7 @@ import { Course } from '../database/entities/course.entity';
 import { Department } from '../database/entities/department.entity';
 import { Doctor } from '../database/entities/doctor.entity';
 import { Semester } from '../database/entities/semester.entity';
+import { generatePdfReport, PdfReportOptions } from './utils/pdf-helper';
 
 @Injectable()
 export class ReportsService {
@@ -185,7 +186,7 @@ export class ReportsService {
     };
   }
 
-  async exportReport(type: string, format: 'csv' | 'pdf'): Promise<{ filename: string; content: string }> {
+  async exportReport(type: string, format: 'csv' | 'pdf'): Promise<{ filename: string; content: string | Buffer; contentType: string }> {
     switch (type) {
       case 'registration':
         return this.exportRegistrationReport(format);
@@ -198,7 +199,7 @@ export class ReportsService {
     }
   }
 
-  private async exportRegistrationReport(format: 'csv' | 'pdf'): Promise<{ filename: string; content: string }> {
+  private async exportRegistrationReport(format: 'csv' | 'pdf'): Promise<{ filename: string; content: string | Buffer; contentType: string }> {
     const registrations = await this.registrationRepo.find({
       where: { status: RegistrationStatus.APPROVED },
       relations: ['student', 'student.user', 'course'],
@@ -218,22 +219,24 @@ export class ReportsService {
           r.registeredAt.toISOString().split('T')[0],
         ].join(','),
       );
-      return { filename: 'registration-report.csv', content: header + rows.join('\n') };
+      return { filename: 'registration-report.csv', content: header + rows.join('\n'), contentType: 'text/csv' };
     }
 
-    const html = this.generateHtmlTable('Registration Report',
-      ['Student ID', 'Student Name', 'Course Code', 'Course'],
-      registrations.map((r) => [
+    const pdfBuffer = generatePdfReport({
+      title: 'Registration Report',
+      subtitle: 'FEE-MENOUF University',
+      headers: ['Student ID', 'Student Name', 'Course Code', 'Course'],
+      rows: registrations.map((r) => [
         r.student?.studentId || '',
         r.student?.user?.fullNameEn || '',
         r.course?.code || '',
         r.course?.nameEn || '',
       ]),
-    );
-    return { filename: 'registration-report.html', content: html };
+    });
+    return { filename: 'registration-report.pdf', content: pdfBuffer, contentType: 'application/pdf' };
   }
 
-  private async exportAttendanceReport(format: 'csv' | 'pdf'): Promise<{ filename: string; content: string }> {
+  private async exportAttendanceReport(format: 'csv' | 'pdf'): Promise<{ filename: string; content: string | Buffer; contentType: string }> {
     const attendances = await this.attendanceRepo.find({
       relations: ['student', 'student.user', 'course'],
       take: 1000,
@@ -251,23 +254,25 @@ export class ReportsService {
           a.method,
         ].join(','),
       );
-      return { filename: 'attendance-report.csv', content: header + rows.join('\n') };
+      return { filename: 'attendance-report.csv', content: header + rows.join('\n'), contentType: 'text/csv' };
     }
 
-    const html = this.generateHtmlTable('Attendance Report',
-      ['Student ID', 'Student Name', 'Course', 'Status', 'Date'],
-      attendances.map((a) => [
+    const pdfBuffer = generatePdfReport({
+      title: 'Attendance Report',
+      subtitle: 'FEE-MENOUF University',
+      headers: ['Student ID', 'Student Name', 'Course', 'Status', 'Date'],
+      rows: attendances.map((a) => [
         a.student?.studentId || '',
         a.student?.user?.fullNameEn || '',
         a.course?.code || '',
         a.status,
         a.date.toISOString().split('T')[0],
       ]),
-    );
-    return { filename: 'attendance-report.html', content: html };
+    });
+    return { filename: 'attendance-report.pdf', content: pdfBuffer, contentType: 'application/pdf' };
   }
 
-  private async exportGradeReport(format: 'csv' | 'pdf'): Promise<{ filename: string; content: string }> {
+  private async exportGradeReport(format: 'csv' | 'pdf'): Promise<{ filename: string; content: string | Buffer; contentType: string }> {
     const totalGrades = await this.gradeRepo.find({
       where: { component: GradeComponent.TOTAL },
       relations: ['student', 'student.user', 'course'],
@@ -286,12 +291,14 @@ export class ReportsService {
           g.maxScore > 0 ? ((g.score / g.maxScore) * 100).toFixed(1) : '0',
         ].join(','),
       );
-      return { filename: 'grade-report.csv', content: header + rows.join('\n') };
+      return { filename: 'grade-report.csv', content: header + rows.join('\n'), contentType: 'text/csv' };
     }
 
-    const html = this.generateHtmlTable('Grade Report',
-      ['Student ID', 'Student Name', 'Course', 'Score', 'Max', 'Percentage'],
-      totalGrades.map((g) => [
+    const pdfBuffer = generatePdfReport({
+      title: 'Grade Report',
+      subtitle: 'FEE-MENOUF University',
+      headers: ['Student ID', 'Student Name', 'Course', 'Score', 'Max', 'Percentage'],
+      rows: totalGrades.map((g) => [
         g.student?.studentId || '',
         g.student?.user?.fullNameEn || '',
         g.course?.code || '',
@@ -299,39 +306,8 @@ export class ReportsService {
         g.maxScore.toString(),
         g.maxScore > 0 ? ((g.score / g.maxScore) * 100).toFixed(1) + '%' : '0%',
       ]),
-    );
-    return { filename: 'grade-report.html', content: html };
+    });
+    return { filename: 'grade-report.pdf', content: pdfBuffer, contentType: 'application/pdf' };
   }
 
-  private generateHtmlTable(title: string, headers: string[], rows: string[][]): string {
-    const headerRow = headers.map((h) => `<th>${this.escapeHtml(h)}</th>`).join('');
-    const dataRows = rows.map((row) => `<tr>${row.map((c) => `<td>${this.escapeHtml(c)}</td>`).join('')}</tr>`).join('\n');
-
-    return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>${this.escapeHtml(title)}</title>
-<style>
-body{font-family:Arial,sans-serif;margin:20px}
-h1{color:#1a5276}
-table{width:100%;border-collapse:collapse;margin:20px 0}
-th{background:#1a5276;color:white;padding:10px;text-align:left}
-td{border:1px solid #ddd;padding:8px}
-tr:nth-child(even){background:#f5f5f5}
-.footer{margin-top:20px;font-size:12px;color:#666;text-align:center}
-</style></head><body>
-<h1>${this.escapeHtml(title)}</h1>
-<p>Generated on: ${this.escapeHtml(new Date().toLocaleDateString())}</p>
-<table><thead><tr>${headerRow}</tr></thead><tbody>${dataRows}</tbody></table>
-<div class="footer">FEE-MENOUF University - Faculty of Engineering, Menoufia University</div>
-</body></html>`;
-  }
-
-  private escapeHtml(str: string): string {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  }
 }
