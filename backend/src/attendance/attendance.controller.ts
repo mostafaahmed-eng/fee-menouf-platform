@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, UseGuards, ParseUUIDPipe, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AttendanceService } from './attendance.service';
 import { MarkAttendanceDto } from './dto/mark-attendance.dto';
@@ -10,13 +10,17 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../database/entities';
+import { StudentsService } from '../students/students.service';
 
 @ApiTags('Attendance')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('attendance')
 export class AttendanceController {
-  constructor(private readonly attendanceService: AttendanceService) {}
+  constructor(
+    private readonly attendanceService: AttendanceService,
+    private readonly studentsService: StudentsService,
+  ) {}
 
   @Post('mark')
   @Roles(UserRole.DOCTOR, UserRole.TA, UserRole.ADMIN)
@@ -58,7 +62,16 @@ export class AttendanceController {
   @Get('student/:studentId')
   @Roles(UserRole.STUDENT, UserRole.DOCTOR, UserRole.TA, UserRole.ADMIN, UserRole.ADVISOR)
   @ApiOperation({ summary: 'Get attendance records for a student' })
-  getStudentAttendance(@Param('studentId', ParseUUIDPipe) studentId: string) {
+  async getStudentAttendance(
+    @Param('studentId', ParseUUIDPipe) studentId: string,
+    @CurrentUser() currentUser: { id: string; role: UserRole },
+  ) {
+    if (currentUser.role === UserRole.STUDENT) {
+      const student = await this.studentsService.findByUserId(currentUser.id);
+      if (!student || student.id !== studentId) {
+        throw new ForbiddenException('You can only view your own attendance');
+      }
+    }
     return this.attendanceService.getStudentAttendance(studentId);
   }
 

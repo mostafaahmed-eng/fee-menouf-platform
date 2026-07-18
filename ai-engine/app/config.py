@@ -12,14 +12,15 @@ class Settings(BaseSettings):
     )
 
     OPENAI_API_KEY: str = ""
-    FALLBACK_MODEL: str = "gpt-3.5-turbo"
+    OPENAI_BASE_URL: str = "https://openrouter.ai/api/v1"
+    FALLBACK_MODEL: str = "meta-llama/llama-3.2-3b-instruct:free"
     OFFLINE_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
-    MODEL_NAME: str = "gpt-4-turbo"
+    MODEL_NAME: str = "meta-llama/llama-3.2-3b-instruct:free"
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
     EMBEDDING_DIMENSION: int = 384
 
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/fee_ai"
-    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_URL: str = "redis://:b90245bb392c162d0b1453c9dbc435c9@redis:6379/0"
 
     MAX_TOKENS: int = 4096
     TEMPERATURE: float = 0.7
@@ -46,11 +47,23 @@ class Settings(BaseSettings):
     MODEL_CACHE_DIR: str = "data/models"
     ENABLE_CACHE: bool = True
 
-    FALLBACK_OPENAI: bool = True
+    FALLBACK_OPENAI: bool = False
+    OPENROUTER_FALLBACK_MODELS: list[str] = [
+        "meta-llama/llama-3.2-3b-instruct:free",
+        "nvidia/nemotron-3-nano-30b-a3b:free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "nvidia/nemotron-nano-9b-v2:free",
+    ]
 
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",")]
+
+    @property
+    def masked_api_key(self) -> str:
+        if not self.OPENAI_API_KEY:
+            return "(not set)"
+        return self.OPENAI_API_KEY[:8] + "..." + self.OPENAI_API_KEY[-4:]
 
 
 settings = Settings()

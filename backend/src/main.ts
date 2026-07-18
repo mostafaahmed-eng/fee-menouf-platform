@@ -75,41 +75,43 @@ async function bootstrap() {
 
   app.useGlobalInterceptors(new ClassSerializerInterceptor(reflector));
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('FEE-MENOUF Smart University Platform API')
-    .setDescription('Comprehensive API for the Faculty of Electronic Engineering, Menoufia University smart platform')
-    .setVersion('1.0')
-    .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', in: 'header' },
-      'access-token',
-    )
-    .addTag('Auth', 'Authentication and authorization endpoints')
-    .addTag('Users', 'User management endpoints')
-    .addTag('Courses', 'Course management endpoints')
-    .addTag('Departments', 'Department management endpoints')
-    .addTag('Students', 'Student management endpoints')
-    .addTag('Academic', 'Academic years and semesters endpoints')
-    .addTag('Attendance', 'Attendance tracking endpoints')
-    .addTag('Grades', 'Grade management endpoints')
-    .addTag('Exams', 'Exam and exam schedule endpoints')
-    .addTag('Schedule', 'Schedule generation endpoints')
-    .addTag('Notifications', 'Notification endpoints')
-    .addTag('Materials', 'Course materials endpoints')
-    .addTag('AI', 'AI assistant conversation endpoints')
-    .addServer(`http://localhost:${port}`, 'Development server')
-    .build();
+  if (process.env.NODE_ENV !== 'production') {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('FEE-MENOUF Smart University Platform API')
+      .setDescription('Comprehensive API for the Faculty of Electronic Engineering, Menoufia University smart platform')
+      .setVersion('1.0')
+      .addBearerAuth(
+        { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', in: 'header' },
+        'access-token',
+      )
+      .addTag('Auth', 'Authentication and authorization endpoints')
+      .addTag('Users', 'User management endpoints')
+      .addTag('Courses', 'Course management endpoints')
+      .addTag('Departments', 'Department management endpoints')
+      .addTag('Students', 'Student management endpoints')
+      .addTag('Academic', 'Academic years and semesters endpoints')
+      .addTag('Attendance', 'Attendance tracking endpoints')
+      .addTag('Grades', 'Grade management endpoints')
+      .addTag('Exams', 'Exam and exam schedule endpoints')
+      .addTag('Schedule', 'Schedule generation endpoints')
+      .addTag('Notifications', 'Notification endpoints')
+      .addTag('Materials', 'Course materials endpoints')
+      .addTag('AI', 'AI assistant conversation endpoints')
+      .addServer(`http://localhost:${port}`, 'Development server')
+      .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup(swaggerPath, app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-      docExpansion: 'none',
-      filter: true,
-      showRequestDuration: true,
-    },
-  });
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup(swaggerPath, app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        docExpansion: 'none',
+        filter: true,
+        showRequestDuration: true,
+      },
+    });
 
-  logger.log(`Swagger documentation available at http://localhost:${port}${swaggerPath}`);
+    logger.log(`Swagger documentation available at http://localhost:${port}${swaggerPath}`);
+  }
   logger.log(`Application is running on port ${port}`);
   logger.log(`API prefix: ${apiPrefix}`);
 

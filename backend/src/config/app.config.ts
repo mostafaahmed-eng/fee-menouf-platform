@@ -14,4 +14,6 @@ export default registerAs('app', () => ({
   bcryptSaltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10),
   loginRateLimitMax: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '5', 10),
   loginRateLimitWindow: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW || '900000', 10),
+  aiEngineUrl: process.env.AI_ENGINE_URL || 'http://ai-engine:8000',
+  qrSigningKey: process.env.QR_SIGNING_KEY,
 }));

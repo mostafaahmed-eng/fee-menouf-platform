@@ -43,17 +43,17 @@ interface CourseOption {
 }
 
 const statusColors: Record<string, string> = {
-  present: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30',
-  absent: 'bg-red-500/15 text-red-600 border-red-500/30',
-  late: 'bg-amber-500/15 text-amber-600 border-amber-500/30',
-  excused: 'bg-blue-500/15 text-blue-600 border-blue-500/30',
+  PRESENT: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30',
+  ABSENT: 'bg-red-500/15 text-red-600 border-red-500/30',
+  LATE: 'bg-amber-500/15 text-amber-600 border-amber-500/30',
+  EXCUSED: 'bg-blue-500/15 text-blue-600 border-blue-500/30',
 };
 
 const statusLabels: Record<string, string> = {
-  present: 'حاضر',
-  absent: 'غائب',
-  late: 'متأخر',
-  excused: 'بعذر',
+  PRESENT: 'حاضر',
+  ABSENT: 'غائب',
+  LATE: 'متأخر',
+  EXCUSED: 'بعذر',
 };
 
 const markedByLabels: Record<string, string> = {
@@ -80,10 +80,10 @@ export default function AttendancePage() {
   const stats = useMemo(() => {
     if (!records || records.length === 0) return undefined;
     const total = records.length;
-    const present = records.filter((r) => r.status === 'present').length;
-    const absent = records.filter((r) => r.status === 'absent').length;
-    const late = records.filter((r) => r.status === 'late').length;
-    const excused = records.filter((r) => r.status === 'excused').length;
+    const present = records.filter((r) => r.status === 'PRESENT').length;
+    const absent = records.filter((r) => r.status === 'ABSENT').length;
+    const late = records.filter((r) => r.status === 'LATE').length;
+    const excused = records.filter((r) => r.status === 'EXCUSED').length;
     const percentage = (present / total) * 100;
     return { total, present, absent, late, excused, percentage };
   }, [records]);
@@ -112,7 +112,7 @@ export default function AttendancePage() {
       acc[r.courseId] = { present: 0, total: 0 };
     }
     acc[r.courseId].total++;
-    if (r.status === 'present') acc[r.courseId].present++;
+    if (r.status === 'PRESENT') acc[r.courseId].present++;
     return acc;
   }, {});
 
@@ -235,10 +235,10 @@ export default function AttendancePage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">الكل</SelectItem>
-                <SelectItem value="present">حاضر</SelectItem>
-                <SelectItem value="absent">غائب</SelectItem>
-                <SelectItem value="late">متأخر</SelectItem>
-                <SelectItem value="excused">بعذر</SelectItem>
+                <SelectItem value="PRESENT">حاضر</SelectItem>
+                <SelectItem value="ABSENT">غائب</SelectItem>
+                <SelectItem value="LATE">متأخر</SelectItem>
+                <SelectItem value="EXCUSED">بعذر</SelectItem>
               </SelectContent>
             </Select>
             <Button variant="ghost" onClick={() => { setSearch(''); setFilterCourse('all'); setFilterStatus('all'); }}>

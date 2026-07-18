@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslation } from '@/lib/i18n/use-translation';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { ArrowLeft, BookOpen, Send, AlertTriangle, History } from 'lucide-react';
@@ -32,10 +32,12 @@ import {
 import { toast } from 'sonner';
 import { CHART_COLORS_HEX } from '@/lib/chart-colors';
 import GradeDistribution from './components/grade-distribution';
+import GradeEntryTable from './components/grade-entry-table';
 
 export default function GradesPage() {
   const { direction } = useTranslation();
   const [selectedCourse, setSelectedCourse] = useState('');
+  const [selectedComponent, setSelectedComponent] = useState('MIDTERM');
   const [activeTab, setActiveTab] = useState('entry');
 
   const { data: courses, isLoading: coursesLoading } = useQuery({
@@ -46,6 +48,15 @@ export default function GradesPage() {
     },
   });
 
+  const { data: studentsData, isLoading: studentsLoading } = useQuery({
+    queryKey: ['faculty', 'students', selectedCourse],
+    queryFn: async () => {
+      const { data } = await api.get(`/courses/${selectedCourse}/students`);
+      return data.data;
+    },
+    enabled: !!selectedCourse,
+  });
+
   const { data: gradesData } = useQuery({
     queryKey: ['faculty', 'grades', 'course', selectedCourse],
     queryFn: async () => {
@@ -53,6 +64,57 @@ export default function GradesPage() {
       return data.data;
     },
     enabled: !!selectedCourse,
+  });
+
+  const [marks, setMarks] = useState<Record<string, number | null>>({});
+
+  const gradeEntryStudents = useMemo(() => {
+    if (!studentsData || !Array.isArray(studentsData)) return [];
+    const gradeMap = new Map<string, number | null>();
+    if (Array.isArray(gradesData)) {
+      gradesData.forEach((g: { studentId?: string; student_id?: string; component?: string; marks?: number | null }) => {
+        if (g.component === selectedComponent) {
+          const sid = g.studentId || g.student_id || '';
+          gradeMap.set(sid, g.marks ?? null);
+        }
+      });
+    }
+    return studentsData.map((s: { id: string; studentId?: string; student_id?: string; name?: string }) => ({
+      id: s.id,
+      student_id: s.studentId || s.student_id || s.id,
+      student_name: s.name || '',
+      marks: gradeMap.get(s.studentId || s.student_id || s.id) ?? marks[s.id] ?? null,
+      max_marks: 100,
+    }));
+  }, [studentsData, gradesData, selectedComponent, marks]);
+
+  const handleMarksChange = useCallback((studentId: string, value: number | null) => {
+    setMarks((prev) => ({ ...prev, [studentId]: value }));
+  }, []);
+
+  const saveGradesMutation = useMutation({
+    mutationFn: async () => {
+      const payload = gradeEntryStudents
+        .filter((s) => s.marks !== null)
+        .map((s) => ({
+          studentId: s.student_id,
+          component: selectedComponent,
+          marks: s.marks,
+          maxMarks: s.max_marks,
+        }));
+      const { data } = await api.post('/grades/bulk', {
+        courseId: selectedCourse,
+        grades: payload,
+      });
+      return data.data;
+    },
+    onSuccess: () => {
+      toast.success('تم حفظ الدرجات بنجاح');
+      setMarks({});
+    },
+    onError: () => {
+      toast.error('حدث خطأ أثناء حفظ الدرجات');
+    },
   });
 
   const gradeDistData = useMemo(() => {
@@ -140,10 +202,47 @@ export default function GradesPage() {
 
           <TabsContent value="entry" className="mt-4 space-y-4">
             <Card>
-              <CardContent className="pt-6 text-center text-muted-foreground">
-                <p>{gradesData && Array.isArray(gradesData) ? `${gradesData.length} طالب` : 'لم يتم تكوين مكونات التقييم لهذه المادة'}</p>
+              <CardHeader>
+                <CardTitle>إدخال الدرجات</CardTitle>
+                <CardDescription>اختر المكون ثم أدخل درجات الطلاب</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Select value={selectedComponent} onValueChange={setSelectedComponent}>
+                  <SelectTrigger className="w-full sm:w-72">
+                    <SelectValue placeholder="اختر المكون" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GRADE_COMPONENTS.map((comp) => (
+                      <SelectItem key={comp.value} value={comp.value}>
+                        {comp.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </CardContent>
             </Card>
+
+            {studentsLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : gradeEntryStudents.length > 0 ? (
+              <GradeEntryTable
+                students={gradeEntryStudents}
+                onMarksChange={handleMarksChange}
+                onSave={() => saveGradesMutation.mutate()}
+                isSaving={saveGradesMutation.isPending}
+                componentName={GRADE_COMPONENTS.find((c) => c.value === selectedComponent)?.label || ''}
+              />
+            ) : (
+              <Card>
+                <CardContent className="pt-6 text-center text-muted-foreground">
+                  <p>لا يوجد طالب مسجلين في هذه المادة</p>
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardContent className="pt-6">

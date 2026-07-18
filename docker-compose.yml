@@ -159,6 +159,8 @@ services:
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
       MINIO_USE_SSL: "false"
+      AI_ENGINE_URL: http://ai-engine:8000
+      QR_SIGNING_KEY: ${QR_SIGNING_KEY:?error}
     volumes:
       - backend_node_modules:/app/node_modules
     depends_on:
@@ -243,6 +245,7 @@ services:
       DB_PORT: 5432
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     volumes:
       - chromadb_data:/app/data/chromadb
     depends_on:

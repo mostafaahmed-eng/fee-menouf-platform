@@ -45,6 +45,50 @@ export default function AttendancePage() {
   const [lectureDate, setLectureDate] = useState(new Date().toISOString().split('T')[0]);
   const [students, setStudents] = useState<StudentAttendance[]>([]);
   const [activeTab, setActiveTab] = useState('mark');
+  const [reportCourseId, setReportCourseId] = useState('');
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
+  const [reportData, setReportData] = useState<{ studentId: string; studentName: string; totalSessions: number; attendedSessions: number; percentage: number }[]>([]);
+  const [reportLoading, setReportLoading] = useState(false);
+
+  const handleShowReport = async () => {
+    if (!reportCourseId) {
+      toast.error('يرجى اختيار المادة');
+      return;
+    }
+    setReportLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (reportStartDate) params.append('startDate', reportStartDate);
+      if (reportEndDate) params.append('endDate', reportEndDate);
+      const qs = params.toString();
+      const { data } = await api.get(`/attendance/report/${reportCourseId}${qs ? `?${qs}` : ''}`);
+      setReportData(data.data || []);
+    } catch {
+      toast.error('حدث خطأ أثناء جلب التقرير');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  const handleExportReport = () => {
+    if (reportData.length === 0) {
+      toast.error('لا توجد بيانات للتصدير');
+      return;
+    }
+    const csv = [
+      ['Student ID', 'Student Name', 'Total Sessions', 'Attended Sessions', 'Attendance %'].join(','),
+      ...reportData.map((r) => [r.studentId, r.studentName, r.totalSessions, r.attendedSessions, r.percentage].join(',')),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `attendance-report-${reportCourseId}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('تم تصدير التقرير');
+  };
 
   const { data: courses, isLoading: coursesLoading } = useQuery({
     queryKey: ['faculty', 'courses', 'attendance'],
@@ -245,7 +289,7 @@ export default function AttendancePage() {
               <div className="flex gap-4">
                 <div className="flex-1 space-y-2">
                   <Label>المادة</Label>
-                  <Select>
+                  <Select value={reportCourseId} onValueChange={setReportCourseId}>
                     <SelectTrigger>
                       <SelectValue placeholder="اختر المادة" />
                     </SelectTrigger>
@@ -260,23 +304,58 @@ export default function AttendancePage() {
                 </div>
                 <div className="space-y-2">
                   <Label>من تاريخ</Label>
-                  <Input type="date" />
+                  <Input type="date" value={reportStartDate} onChange={(e) => setReportStartDate(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label>إلى تاريخ</Label>
-                  <Input type="date" />
+                  <Input type="date" value={reportEndDate} onChange={(e) => setReportEndDate(e.target.value)} />
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="gap-2" onClick={handleShowReport} disabled={reportLoading}>
                   <Download className="h-4 w-4" />
-                  عرض التقرير
+                  {reportLoading ? 'جاري التحميل...' : 'عرض التقرير'}
                 </Button>
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="gap-2" onClick={handleExportReport} disabled={reportData.length === 0}>
                   <Download className="h-4 w-4" />
                   تصدير CSV
                 </Button>
               </div>
+
+              {reportData.length > 0 && (
+                <div className="overflow-x-auto rounded-lg border mt-4">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="p-3 text-right font-medium">#</th>
+                        <th className="p-3 text-right font-medium">الاسم</th>
+                        <th className="p-3 text-center font-medium">إجمالي المحاضرات</th>
+                        <th className="p-3 text-center font-medium">المحاضرات المحضورة</th>
+                        <th className="p-3 text-center font-medium">نسبة الحضور</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportData.map((row, idx) => (
+                        <tr key={row.studentId} className="border-b transition-colors hover:bg-muted/30">
+                          <td className="p-3 text-muted-foreground">{idx + 1}</td>
+                          <td className="p-3 font-medium">{row.studentName}</td>
+                          <td className="p-3 text-center">{row.totalSessions}</td>
+                          <td className="p-3 text-center">{row.attendedSessions}</td>
+                          <td className="p-3 text-center">
+                            <span className={row.percentage >= 75 ? 'text-green-600 font-medium' : row.percentage >= 50 ? 'text-yellow-600 font-medium' : 'text-red-600 font-medium'}>
+                              {row.percentage.toFixed(1)}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {reportData.length === 0 && reportCourseId && !reportLoading && (
+                <p className="text-center text-muted-foreground py-4">لا توجد بيانات حضور لهذه المادة</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

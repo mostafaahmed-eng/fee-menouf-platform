@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Param, Body, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Param, Body, UseGuards, ParseUUIDPipe, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { RegistrationService } from './registration.service';
 import { RegisterCourseDto } from './dto/register-course.dto';
@@ -8,13 +8,17 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../database/entities';
+import { StudentsService } from '../students/students.service';
 
 @ApiTags('Registration')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('registration')
 export class RegistrationController {
-  constructor(private readonly registrationService: RegistrationService) {}
+  constructor(
+    private readonly registrationService: RegistrationService,
+    private readonly studentsService: StudentsService,
+  ) {}
 
   @Post('register')
   @Roles(UserRole.STUDENT, UserRole.ADVISOR, UserRole.ADMIN)
@@ -34,7 +38,16 @@ export class RegistrationController {
   @Get('student/:studentId')
   @Roles(UserRole.STUDENT, UserRole.ADVISOR, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get all registrations for a student' })
-  getStudentRegistrations(@Param('studentId', ParseUUIDPipe) studentId: string) {
+  async getStudentRegistrations(
+    @Param('studentId', ParseUUIDPipe) studentId: string,
+    @CurrentUser() currentUser: { id: string; role: UserRole },
+  ) {
+    if (currentUser.role === UserRole.STUDENT) {
+      const student = await this.studentsService.findByUserId(currentUser.id);
+      if (!student || student.id !== studentId) {
+        throw new ForbiddenException('You can only view your own registrations');
+      }
+    }
     return this.registrationService.getStudentRegistrations(studentId);
   }
 

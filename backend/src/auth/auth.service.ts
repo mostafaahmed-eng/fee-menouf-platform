@@ -184,7 +184,7 @@ export class AuthService {
         secret: this.configService.get<string>('jwt.refreshSecret'),
       });
       const user = await this.userRepository.findOne({ where: { id: payload.sub, isActive: true } });
-      if (!user || user.refreshToken !== refreshToken) {
+      if (!user || user.refreshToken !== this.hashToken(refreshToken)) {
         throw new UnauthorizedException('Invalid refresh token');
       }
       const tokens = await this.generateTokens(user);
@@ -316,7 +316,8 @@ export class AuthService {
       audience: this.configService.get<string>('jwt.audience'),
     });
 
-    await this.userRepository.update(user.id, { refreshToken });
+    const hashedRefreshToken = this.hashToken(refreshToken);
+    await this.userRepository.update(user.id, { refreshToken: hashedRefreshToken });
 
     return { accessToken, refreshToken };
   }

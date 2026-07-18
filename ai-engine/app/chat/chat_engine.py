@@ -23,18 +23,34 @@ CONVERSATION_SUMMARY_THRESHOLD = 20
 class ChatEngine:
     def __init__(self):
         self._openai_client = None
+        self._current_model = None
+        self._model_index = 0
 
     def _get_openai_client(self):
         if self._openai_client is None and settings.OPENAI_API_KEY:
             try:
                 from openai import AsyncOpenAI
-                self._openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+                self._openai_client = AsyncOpenAI(
+                    api_key=settings.OPENAI_API_KEY,
+                    base_url=settings.OPENAI_BASE_URL,
+                )
+                self._current_model = settings.MODEL_NAME
+                logger.info(f"OpenAI client initialized (model={self._current_model})")
             except Exception as e:
-                logger.error(f"Failed to create OpenAI client: {e}")
+                logger.error("Failed to create OpenAI client")
         return self._openai_client
 
     def _get_system_prompt(self, language: str) -> str:
         return SYSTEM_PROMPT_AR if language == "ar" else SYSTEM_PROMPT_EN
+
+    def _try_fallback_model(self) -> Optional[str]:
+        self._model_index += 1
+        if self._model_index < len(settings.OPENROUTER_FALLBACK_MODELS):
+            model = settings.OPENROUTER_FALLBACK_MODELS[self._model_index]
+            self._current_model = model
+            logger.info(f"Trying fallback model: {model}")
+            return model
+        return None
 
     def _build_source_citations(self, retrieved_docs: list[dict]) -> str:
         if not retrieved_docs:
@@ -202,7 +218,7 @@ class ChatEngine:
         if client:
             try:
                 response = await client.chat.completions.create(
-                    model=settings.MODEL_NAME,
+                    model=self._current_model or settings.MODEL_NAME,
                     messages=messages,
                     max_tokens=settings.MAX_TOKENS,
                     temperature=settings.TEMPERATURE,
@@ -231,7 +247,32 @@ class ChatEngine:
                 }
 
             except Exception as e:
-                logger.error(f"OpenAI API call failed: {e}")
+                logger.error(f"OpenAI API call failed with model {self._current_model}: {e}")
+                fallback_model = self._try_fallback_model()
+                if fallback_model:
+                    try:
+                        response = await client.chat.completions.create(
+                            model=fallback_model,
+                            messages=messages,
+                            max_tokens=settings.MAX_TOKENS,
+                            temperature=settings.TEMPERATURE,
+                        )
+                        answer = response.choices[0].message.content or ""
+                        completion_tokens = response.usage.completion_tokens if response.usage else count_tokens(answer)
+                        total_tokens = response.usage.total_tokens if response.usage else (prompt_tokens + completion_tokens)
+                        session_store.add_message(session_id, "user", query, prompt_tokens)
+                        session_store.add_message(session_id, "assistant", answer, completion_tokens)
+                        session_store.update_token_usage(session_id, prompt_tokens, completion_tokens)
+                        sources = self._format_sources_for_response(built_context.get("retrieved_docs", []))
+                        return {
+                            "answer": answer,
+                            "session_id": session_id,
+                            "language": language,
+                            "token_usage": {"prompt": prompt_tokens, "completion": completion_tokens, "total": total_tokens},
+                            "sources": sources,
+                        }
+                    except Exception as e2:
+                        logger.error(f"Fallback model {fallback_model} also failed: {e2}")
 
         answer = self._generate_fallback(query, built_context, language)
 
@@ -298,7 +339,7 @@ class ChatEngine:
         if client:
             try:
                 stream = await client.chat.completions.create(
-                    model=settings.MODEL_NAME,
+                    model=self._current_model or settings.MODEL_NAME,
                     messages=messages,
                     max_tokens=settings.MAX_TOKENS,
                     temperature=settings.TEMPERATURE,
@@ -318,7 +359,7 @@ class ChatEngine:
                 return
 
             except Exception as e:
-                logger.error(f"OpenAI stream failed: {e}")
+                logger.error(f"OpenAI stream failed with model {self._current_model}: {e}")
 
         answer = self._generate_fallback(query, built_context, language)
         for word in answer.split():

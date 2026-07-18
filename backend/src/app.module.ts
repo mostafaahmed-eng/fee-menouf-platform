@@ -35,6 +35,7 @@ import { ReportsModule } from './reports/reports.module';
 import { QrModule } from './qr/qr.module';
 import { HealthModule } from './health/health.module';
 import { ProgramsModule } from './programs/programs.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -115,6 +116,7 @@ import { ProgramsModule } from './programs/programs.module';
     QrModule,
     HealthModule,
     ProgramsModule,
+    SettingsModule,
   ],
   providers: [
     {

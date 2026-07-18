@@ -20,12 +20,13 @@ export class AiController {
   @ApiOperation({ summary: 'Send a message to AI assistant' })
   async chat(
     @CurrentUser('id') userId: string,
-    @Body() dto: { message: string; language?: ConversationLanguage; sessionId?: string },
+    @Body() dto: { message: string; language?: string; sessionId?: string },
   ) {
+    const lang = dto.language?.toUpperCase() === 'AR' ? ConversationLanguage.AR : ConversationLanguage.EN;
     return this.aiService.sendMessage(
       userId,
       dto.message,
-      dto.language || ConversationLanguage.EN,
+      lang,
       dto.sessionId,
     );
   }

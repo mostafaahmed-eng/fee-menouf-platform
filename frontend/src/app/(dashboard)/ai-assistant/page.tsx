@@ -90,7 +90,12 @@ export default function AiAssistantPage() {
     setMessages((prev) => [...prev, userMessage]);
     setIsTyping(true);
 
-    const token = localStorage.getItem('accessToken');
+    const token = (() => {
+      try {
+        const raw = localStorage.getItem('auth-storage');
+        return raw ? JSON.parse(raw).state?.token : null;
+      } catch { return null; }
+    })();
     try {
       const response = await fetch(`/ai/api/v1/chat/stream`, {
         method: 'POST',

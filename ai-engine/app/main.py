@@ -73,6 +73,7 @@ async def health_check():
         "version": "1.0.0",
         "model": settings.MODEL_NAME,
         "embedding_model": settings.EMBEDDING_MODEL,
+        "llm_configured": bool(settings.OPENAI_API_KEY),
     }
 
 

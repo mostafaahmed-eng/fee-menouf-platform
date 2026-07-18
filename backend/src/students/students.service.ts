@@ -100,6 +100,13 @@ export class StudentsService {
     });
   }
 
+  async findByUserId(userId: string): Promise<Student | null> {
+    return this.studentRepository.findOne({
+      where: { user: { id: userId } },
+      relations: { user: true, department: true, program: true, academicYear: true, semester: true },
+    });
+  }
+
   async update(id: string, dto: UpdateStudentDto): Promise<Student> {
     const student = await this.findOne(id);
     if (dto.level !== undefined) student.level = dto.level;

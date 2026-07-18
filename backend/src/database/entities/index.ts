@@ -23,3 +23,4 @@ export { CourseMaterial, MaterialType } from './course-material.entity';
 export { Announcement, AnnouncementPriority } from './announcement.entity';
 export { Warning, WarningType } from './warning.entity';
 export { GpaHistory } from './gpa-history.entity';
+export { SystemSetting } from './system-setting.entity';

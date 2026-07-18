@@ -1,6 +1,16 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 
-const QR_SECRET = process.env.QR_SIGNING_KEY || 'fee-menouf-qr-signing-key-change-in-production';
+const QR_SECRET = (() => {
+  const key = process.env.QR_SIGNING_KEY;
+  if (!key) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('QR_SIGNING_KEY environment variable is required in production');
+    }
+    console.warn('[QR-SIGNER] Using fallback QR_SECRET — set QR_SIGNING_KEY in production!');
+    return 'fee-menouf-qr-signing-key-change-in-production';
+  }
+  return key;
+})();
 
 export interface QrPayload {
   lectureId: string;

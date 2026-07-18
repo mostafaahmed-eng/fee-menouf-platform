@@ -6,7 +6,7 @@ import {
   Semester, AcademicYear, CourseRegistration, Attendance, Lecture,
   Grade, Exam, ExamSchedule, Classroom, Notification, AiConversation,
   Schedule, AuditLog, CourseMaterial, Announcement,
-  Warning, GpaHistory,
+  Warning, GpaHistory, SystemSetting,
 } from './entities';
 import { FileEntity } from '../files/entities/file.entity';
 
@@ -15,7 +15,7 @@ const entities = [
   Semester, AcademicYear, CourseRegistration, Attendance, Lecture,
   Grade, Exam, ExamSchedule, Classroom, Notification, AiConversation,
   Schedule, AuditLog, CourseMaterial, Announcement,
-  Warning, GpaHistory, FileEntity,
+  Warning, GpaHistory, SystemSetting, FileEntity,
 ];
 
 @Global()

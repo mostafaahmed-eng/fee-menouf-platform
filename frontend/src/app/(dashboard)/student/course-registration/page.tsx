@@ -83,7 +83,15 @@ export default function CourseRegistrationPage() {
   const { data: summary, isLoading: summaryLoading } = useQuery<RegistrationSummary>({
     queryKey: ['registration-summary', studentId],
     queryFn: () =>
-      api.get(`/registration/student/${studentId}`).then((r) => r.data.data),
+      api.get(`/registration/student/${studentId}`).then((r) => {
+        const regs = r.data.data || [];
+        return {
+          totalCredits: regs.reduce((sum: number, r: any) => sum + (r.course?.credits || 0), 0),
+          maxCredits: 21,
+          coursesCount: regs.length,
+          status: 'active',
+        };
+      }),
     enabled: !!studentId,
   });
 

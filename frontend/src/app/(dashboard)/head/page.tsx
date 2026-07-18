@@ -47,19 +47,19 @@ export default function HeadDashboardPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">إجمالي الطلاب</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold">{deptStats?.total_students || 0}</p></CardContent>
+            <CardContent><p className="text-2xl font-bold">{deptStats?.totalStudents || 0}</p></CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">أعضاء هيئة التدريس</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold">{deptStats?.total_doctors || 0}</p></CardContent>
+            <CardContent><p className="text-2xl font-bold">{deptStats?.totalDoctors || 0}</p></CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">المواد</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold">{deptStats?.total_courses || 0}</p></CardContent>
+            <CardContent><p className="text-2xl font-bold">{deptStats?.totalCourses || 0}</p></CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">البرامج</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold">{deptStats?.total_programs || 0}</p></CardContent>
+            <CardContent><p className="text-2xl font-bold">{deptStats?.totalPrograms || 0}</p></CardContent>
           </Card>
         </div>
       )}
@@ -74,16 +74,16 @@ export default function HeadDashboardPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <div className="flex justify-between text-sm mb-1"><span>معدل الحضور</span><span>{deptStats?.avg_attendance || 0}%</span></div>
-              <Progress value={deptStats?.avg_attendance || 0} className="h-2" />
+              <div className="flex justify-between text-sm mb-1"><span>الطلاب النشطون</span><span>{deptStats?.activeStudents || 0}</span></div>
+              <Progress value={deptStats?.totalStudents ? ((deptStats?.activeStudents || 0) / deptStats.totalStudents) * 100 : 0} className="h-2" />
             </div>
             <div>
-              <div className="flex justify-between text-sm mb-1"><span>معدل النجاح</span><span>{deptStats?.avg_success_rate || 0}%</span></div>
-              <Progress value={deptStats?.avg_success_rate || 0} className="h-2" />
+              <div className="flex justify-between text-sm mb-1"><span>الخريجون</span><span>{deptStats?.graduatedStudents || 0}</span></div>
+              <Progress value={deptStats?.totalStudents ? ((deptStats?.graduatedStudents || 0) / deptStats.totalStudents) * 100 : 0} className="h-2" />
             </div>
             <div>
-              <div className="flex justify-between text-sm mb-1"><span>معدل التخرج</span><span>{deptStats?.graduation_rate || 0}%</span></div>
-              <Progress value={deptStats?.graduation_rate || 0} className="h-2" />
+              <div className="flex justify-between text-sm mb-1"><span>المرشدون</span><span>{deptStats?.totalAdvisors || 0}</span></div>
+              <Progress value={deptStats?.totalDoctors ? ((deptStats?.totalAdvisors || 0) / deptStats.totalDoctors) * 100 : 0} className="h-2" />
             </div>
           </CardContent>
         </Card>

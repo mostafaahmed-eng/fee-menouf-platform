@@ -24,7 +24,10 @@ class VectorStore:
         try:
             self._client = chromadb.PersistentClient(
                 path=settings.CHROMA_PERSIST_DIR,
-                settings=ChromaSettings(anonymized_telemetry=False),
+                settings=ChromaSettings(
+                    anonymized_telemetry=False,
+                    allow_reset=True,
+                ),
             )
             self._collection = self._client.get_or_create_collection(
                 name=settings.VECTOR_COLLECTION_NAME,

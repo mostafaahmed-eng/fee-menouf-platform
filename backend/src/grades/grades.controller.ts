@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Body, Param, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Param, UseGuards, ParseUUIDPipe, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { GradesService } from './grades.service';
 import { CreateGradeDto } from './dto/create-grade.dto';
@@ -7,14 +7,19 @@ import { UpdateGradeDto } from './dto/update-grade.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../database/entities';
+import { StudentsService } from '../students/students.service';
 
 @ApiTags('Grades')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('grades')
 export class GradesController {
-  constructor(private readonly gradesService: GradesService) {}
+  constructor(
+    private readonly gradesService: GradesService,
+    private readonly studentsService: StudentsService,
+  ) {}
 
   @Post()
   @Roles(UserRole.DOCTOR, UserRole.TA, UserRole.ADMIN)
@@ -41,7 +46,16 @@ export class GradesController {
   @Get('student/:studentId')
   @Roles(UserRole.STUDENT, UserRole.DOCTOR, UserRole.ADMIN, UserRole.ADVISOR)
   @ApiOperation({ summary: 'Get all grade components for a student' })
-  getStudentGrades(@Param('studentId', ParseUUIDPipe) studentId: string) {
+  async getStudentGrades(
+    @Param('studentId', ParseUUIDPipe) studentId: string,
+    @CurrentUser() currentUser: { id: string; role: UserRole },
+  ) {
+    if (currentUser.role === UserRole.STUDENT) {
+      const student = await this.studentsService.findByUserId(currentUser.id);
+      if (!student || student.id !== studentId) {
+        throw new ForbiddenException('You can only view your own grades');
+      }
+    }
     return this.gradesService.getStudentGrades(studentId);
   }
 
@@ -62,7 +76,16 @@ export class GradesController {
   @Get('transcript/:studentId')
   @Roles(UserRole.STUDENT, UserRole.ADMIN, UserRole.ADVISOR)
   @ApiOperation({ summary: 'Get full transcript for a student' })
-  getTranscript(@Param('studentId', ParseUUIDPipe) studentId: string) {
+  async getTranscript(
+    @Param('studentId', ParseUUIDPipe) studentId: string,
+    @CurrentUser() currentUser: { id: string; role: UserRole },
+  ) {
+    if (currentUser.role === UserRole.STUDENT) {
+      const student = await this.studentsService.findByUserId(currentUser.id);
+      if (!student || student.id !== studentId) {
+        throw new ForbiddenException('You can only view your own transcript');
+      }
+    }
     return this.gradesService.getStudentTranscript(studentId);
   }
 }
