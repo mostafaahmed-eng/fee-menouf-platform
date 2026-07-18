@@ -7,4 +7,11 @@ export default registerAs('app', () => ({
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:3000').split(','),
   corsMethods: (process.env.CORS_METHODS || 'GET,POST,PUT,PATCH,DELETE,OPTIONS').split(','),
   corsCredentials: process.env.CORS_CREDENTIALS === 'true',
+  redisHost: process.env.REDIS_HOST || 'redis',
+  redisPort: parseInt(process.env.REDIS_PORT || '6379', 10),
+  redisPassword: process.env.REDIS_PASSWORD || undefined,
+  redisDbIndex: parseInt(process.env.REDIS_DB_INDEX || '0', 10),
+  bcryptSaltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10),
+  loginRateLimitMax: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '5', 10),
+  loginRateLimitWindow: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW || '900000', 10),
 }));
